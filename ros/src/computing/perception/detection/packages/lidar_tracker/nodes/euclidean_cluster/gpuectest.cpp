@@ -1154,6 +1154,11 @@ std::string GPUECTest::pointCloudVariationTest(int point_num, int disjoint_comp_
 	e_total_time = timeDiff(start, end) + gpu_initial;
 
 	gettimeofday(&start, NULL);
+	test_sample.extractClusters5();
+	test_sample.getOutput();
+	gettimeofday(&end, NULL);
+
+	gettimeofday(&start, NULL);
 	test_sample.extractClusters(m_total_time, m_initial, m_build_matrix, m_clustering_time, m_itr_num);
 	test_sample.getOutput();
 	gettimeofday(&end, NULL);
@@ -1397,20 +1402,20 @@ std::string GPUECTest::pointDistanceTest(SampleCloud base_cloud, int point_dista
 	gettimeofday(&end, NULL);
 
 	gettimeofday(&start, NULL);
-	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
-
-	tree->setInputCloud (sample_cloud);
+//	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+//
+//	tree->setInputCloud (sample_cloud);
 	gettimeofday(&end, NULL);
 
-	c_tree_build = timeDiff(start, end);
-
-	std::vector<pcl::PointIndices> cluster_indices;
-
-	pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-	ec.setClusterTolerance (d_th);
-	ec.setSearchMethod(tree);
-	ec.setInputCloud (sample_cloud);
-	ec.extract (cluster_indices);
+//	c_tree_build = timeDiff(start, end);
+//
+//	std::vector<pcl::PointIndices> cluster_indices;
+//
+//	pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+//	ec.setClusterTolerance (d_th);
+//	ec.setSearchMethod(tree);
+//	ec.setInputCloud (sample_cloud);
+//	ec.extract (cluster_indices);
 
 	gettimeofday(&end, NULL);
 

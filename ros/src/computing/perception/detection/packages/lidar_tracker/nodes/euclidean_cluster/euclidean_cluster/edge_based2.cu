@@ -2,11 +2,10 @@
 #include "include/utilities.h"
 #include <cuda.h>
 
-
 extern __shared__ float local_buff[];
 
-// Build edge set
-__global__ void edgeCount(float *x, float *y, float *z, int point_num, long long int *edge_count, float threshold)
+// Search for the furthest neighbor
+__global__ void sampleGraphBuild(float *x, float *y, float *z, int point_num, int2 *edge_set, float threshold)
 {
 	float *local_x = local_buff;
 	float *local_y = local_x + blockDim.x;
@@ -19,7 +18,8 @@ __global__ void edgeCount(float *x, float *y, float *z, int point_num, long long
 		float tmp_x = x[pid];
 		float tmp_y = y[pid];
 		float tmp_z = z[pid];
-		long long int count = 0;
+		float min_dist = threshold;
+		int min_pid = -1;
 
 		int block_id;
 
@@ -31,7 +31,12 @@ __global__ void edgeCount(float *x, float *y, float *z, int point_num, long long
 
 			for (int i = 0; i < blockDim.x; i++) {
 				dist = norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]);
-				count += (i + block_id > pid && dist < threshold) ? 1 : 0;
+
+				if (i + block_id > pid && dist < threshold && min_dist > dist) {
+					min_dist = dist;
+					min_pid = i + block_id;
+				}
+				__syncthreads();
 			}
 			__syncthreads();
 		}
@@ -48,20 +53,27 @@ __global__ void edgeCount(float *x, float *y, float *z, int point_num, long long
 
 		for (int i = 0; i < point_num - block_id; i++) {
 			dist = norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]);
-			count += (i + block_id > pid && dist < threshold) ? 1 : 0;
+
+			if (i + block_id > pid && dist < threshold && min_dist > dist) {
+				min_dist = dist;
+				min_pid = i + block_id;
+			}
+			__syncthreads();
 		}
 
 		__syncthreads();
 
-		edge_count[pid] = count;
+		edge_set[pid].x = pid;
+		edge_set[pid].y = min_pid;
 	}
 	__syncthreads();
 
 
 	// Handle last block
 	if (pid >= last_point && pid < point_num) {
-		int count = 0;
 		float tmp_x, tmp_y, tmp_z;
+		float min_dist = threshold;
+		int min_pid = -1;
 
 		if (pid < point_num) {
 			tmp_x = x[pid];
@@ -81,56 +93,71 @@ __global__ void edgeCount(float *x, float *y, float *z, int point_num, long long
 
 			for (int i = 0; i < point_num - block_id; i++) {
 				dist = norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]);
-				count += (i + block_id > pid && dist < threshold) ? 1 : 0;
-			}
-			__syncthreads();
 
-			edge_count[pid] = count;
+				if (i + block_id > pid && dist < threshold && min_dist > dist) {
+					min_dist = dist;
+					min_pid = i + block_id;
+				}
+				__syncthreads();
+			}
+
+			__syncthreads();
 		}
+
+		edge_set[pid].x = pid;
+		edge_set[pid].y = min_pid;
 	}
 
 	__syncthreads();
 
 }
 
-
-__global__ void buildEdgeSet(float *x, float *y, float *z, int point_num, long long int *edge_count, int2 *edge_set, float threshold, long long int edge_num)
+__global__ void sampleGraphBuild2(float *x, float *y, float *z, int point_num, int2 *edge_set, float threshold)
 {
 	float *local_x = local_buff;
 	float *local_y = local_x + blockDim.x;
 	float *local_z = local_y + blockDim.x;
 	int pid;
-	int last_point = (point_num / blockDim.x) * blockDim.x;
-	int2 new_edge;
+	int last_point = (point_num / blockDim.x) * blockDim.x;	// Exclude the last block
+	float dist;
 
 	for (pid = threadIdx.x + blockIdx.x * blockDim.x; pid < last_point; pid += blockDim.x * gridDim.x) {
-		long long int writing_location = edge_count[pid];
 		float tmp_x = x[pid];
 		float tmp_y = y[pid];
 		float tmp_z = z[pid];
+		float lmin = threshold, rmin = threshold;
+		int lpid = -1, rpid = -1;
 
 		int block_id;
 
-		new_edge.x = pid;
-
-		for (block_id = blockIdx.x * blockDim.x; block_id + blockDim.x < point_num; block_id += blockDim.x) {
+		for (block_id = 0; block_id + blockDim.x < point_num; block_id += blockDim.x) {
 			local_x[threadIdx.x] = x[block_id + threadIdx.x];
 			local_y[threadIdx.x] = y[block_id + threadIdx.x];
 			local_z[threadIdx.x] = z[block_id + threadIdx.x];
 			__syncthreads();
 
 			for (int i = 0; i < blockDim.x; i++) {
-				if (i + block_id > pid && norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]) < threshold) {
-					new_edge.y = i + block_id;
+				dist = norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]);
 
-					edge_set[writing_location++] = new_edge;
+				if (i + block_id > pid && dist < threshold && rmin > dist) {
+					rmin = dist;
+					rpid = i + block_id;
 				}
+
+				__syncthreads();
+
+				if (i + block_id < pid && dist < threshold && lmin > dist) {
+					lmin = dist;
+					lpid = i + block_id;
+				}
+				__syncthreads();
 			}
 			__syncthreads();
 		}
+
 		__syncthreads();
 
-
+		// Compare with last block
 		if (threadIdx.x < point_num - block_id) {
 			local_x[threadIdx.x] = x[block_id + threadIdx.x];
 			local_y[threadIdx.x] = y[block_id + threadIdx.x];
@@ -139,47 +166,131 @@ __global__ void buildEdgeSet(float *x, float *y, float *z, int point_num, long l
 		__syncthreads();
 
 		for (int i = 0; i < point_num - block_id; i++) {
-			if (i + block_id > pid && norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]) < threshold) {
-				new_edge.y = i + block_id;
-				edge_set[writing_location++] = new_edge;
+			dist = norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]);
+
+			if (i + block_id > pid && dist < threshold && rmin > dist) {
+				rmin = dist;
+				rpid = i + block_id;
 			}
+			__syncthreads();
+
+			if (i + block_id < pid && dist < threshold && lmin > dist) {
+				lmin = dist;
+				lpid = i + block_id;
+			}
+			__syncthreads();
 		}
+
 		__syncthreads();
 
+		edge_set[pid].x = pid;
+		edge_set[pid].y = rpid;
+		edge_set[pid + point_num].x = pid;
+		edge_set[pid + point_num].y = lpid;
 	}
+	__syncthreads();
 
+
+	// Handle last block
 	if (pid >= last_point) {
 		float tmp_x, tmp_y, tmp_z;
-		int writing_location;
+		float lmin = threshold, rmin = threshold;
+		int lpid = -1, rpid = -1;
 
 		if (pid < point_num) {
-			new_edge.x = pid;
 			tmp_x = x[pid];
 			tmp_y = y[pid];
 			tmp_z = z[pid];
-			writing_location = edge_count[pid];
+		}
+
+		//int block_id = blockIdx.x * blockDim.x;
+		int block_id;
+
+		__syncthreads();
+
+		for (block_id = 0; block_id + blockDim.x < point_num; block_id += blockDim.x) {
+			local_x[threadIdx.x] = x[block_id + threadIdx.x];
+			local_y[threadIdx.x] = y[block_id + threadIdx.x];
+			local_z[threadIdx.x] = z[block_id + threadIdx.x];
+			__syncthreads();
+
+			if (pid < point_num) {
+				for (int i = 0; i < blockDim.x; i++) {
+					dist = norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]);
+
+					if (i + block_id > pid && dist < threshold && rmin > dist) {
+						rmin = dist;
+						rpid = i + block_id;
+					}
+					__syncthreads();
+
+					if (i + block_id < pid && dist < threshold && lmin > dist) {
+						lmin = dist;
+						lpid = i + block_id;
+					}
+					__syncthreads();
+				}
+			}
+			__syncthreads();
+		}
 
 
-			int block_id = blockIdx.x * blockDim.x;
-
+		if (pid < point_num) {
 			local_x[threadIdx.x] = x[pid];
 			local_y[threadIdx.x] = y[pid];
 			local_z[threadIdx.x] = z[pid];
 			__syncthreads();
 
 			for (int i = 0; i < point_num - block_id; i++) {
-				if (i + block_id > pid && norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]) < threshold) {
-					new_edge.y = i + block_id;
-					edge_set[writing_location++] = new_edge;
+				dist = norm3df(tmp_x - local_x[i], tmp_y - local_y[i], tmp_z - local_z[i]);
+
+				if (i + block_id > pid && dist < threshold && rmin > dist) {
+					rmin = dist;
+					rpid = i + block_id;
 				}
+				__syncthreads();
+
+				if (i + block_id < pid && dist < threshold && lmin > dist) {
+					lmin = dist;
+					lpid = i + block_id;
+				}
+				__syncthreads();
 			}
+
+			__syncthreads();
+
+			edge_set[pid].x = pid;
+			edge_set[pid].y = rpid;
+			edge_set[pid + point_num].x = pid;
+			edge_set[pid + point_num].y = lpid;
+		}
+
+		__syncthreads();
+
+
+	}
+
+	__syncthreads();
+
+}
+
+__global__ void markInvalidEdge(int2 *sample_edge_set, int size, int *mark)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < size; i += blockDim.x * gridDim.x) {
+		mark[i] = (sample_edge_set[i].y >= 0) ? 1 : 0;
+	}
+}
+
+__global__ void graphBuild(int2 *sample_edge_set, int size, int *location, int2 *edge_set)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < size; i += blockDim.x * gridDim.x) {
+		if (sample_edge_set[i].y >= 0) {
+			edge_set[location[i]] = sample_edge_set[i];
 		}
 	}
 }
 
-
-
-__global__ void clustering(int2 *edge_set, int size, int *cluster_name, bool *changed)
+__global__ void edgeBasedClustering(int2 *edge_set, int size, int *cluster_name, bool *changed)
 {
 	__shared__ bool schanged;
 
@@ -218,14 +329,14 @@ __global__ void clustering(int2 *edge_set, int size, int *cluster_name, bool *ch
 		*changed = true;
 }
 
-__global__ void clusterCount(int *cluster_name, int *count, int point_num)
+__global__ void clusterCount2(int *cluster_name, int *count, int point_num)
 {
 	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
 		count[cluster_name[i]] = 1;
 	}
 }
 
-void GpuEuclideanCluster2::extractClusters3()
+void GpuEuclideanCluster2::extractClusters5()
 {
 	struct timeval start, end;
 
@@ -236,42 +347,47 @@ void GpuEuclideanCluster2::extractClusters3()
 	block_x = (point_num_ > block_size_x_) ? block_size_x_ : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
-
-	long long int *edge_count;
+	int2 *sample_edge_set;
 
 	gettimeofday(&start, NULL);
-	checkCudaErrors(cudaMalloc(&edge_count, sizeof(long long int) * (point_num_ + 1)));
-	checkCudaErrors(cudaMemset(edge_count, 0x00, sizeof(long long int) * (point_num_ + 1)));
 
+	checkCudaErrors(cudaMalloc(&sample_edge_set, sizeof(int2) * point_num_ * 2));
 
-	edgeCount<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3 + sizeof(long long int) * block_size_x_>>>(x_, y_, z_, point_num_, edge_count, threshold_);
+	sampleGraphBuild2<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, sample_edge_set, threshold_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	long long int edge_num;
-
 	gettimeofday(&end, NULL);
 
-	//std::cout << "Count Edge Set = " << timeDiff(start, end) << std::endl;
+	std::cout << "Sample graph build = " << timeDiff(start, end) << std::endl;
 
-	GUtilities::exclusiveScan(edge_count, point_num_ + 1, &edge_num);
+	gettimeofday(&start, NULL);
 
-	//std::cout << "Edge num = " << edge_num << std::endl;
+	int edge_num;
+	int *mark, *location;
 
+	checkCudaErrors(cudaMalloc(&mark, sizeof(int) * (point_num_ * 2 + 1)));
+
+	location = mark;
+
+	markInvalidEdge<<<grid_x, block_x>>>(sample_edge_set, point_num_ * 2, mark);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	GUtilities::exclusiveScan(mark, point_num_ * 2 + 1, &edge_num);
 
 	if (edge_num == 0) {
-		checkCudaErrors(cudaFree(edge_count));
-		cluster_num_ = 0;
+		checkCudaErrors(cudaFree(sample_edge_set));
+		checkCudaErrors(cudaFree(mark));
+		cluster_num_ = point_num_;
 		return;
 	}
 
 	int2 *edge_set;
 
-	gettimeofday(&start, NULL);
-
 	checkCudaErrors(cudaMalloc(&edge_set, sizeof(int2) * edge_num));
 
-	buildEdgeSet<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, edge_count, edge_set, threshold_, edge_num);
+	graphBuild<<<grid_x, block_x>>>(sample_edge_set, point_num_ * 2, location, edge_set);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -287,7 +403,7 @@ void GpuEuclideanCluster2::extractClusters3()
 
 	gettimeofday(&end, NULL);
 
-	//std::cout << "Build Edge Set = " << timeDiff(start, end) << std::endl;
+	std::cout << "Build Edge Set = " << timeDiff(start, end) << std::endl;
 
 
 	gettimeofday(&start, NULL);
@@ -296,7 +412,7 @@ void GpuEuclideanCluster2::extractClusters3()
 
 		checkCudaErrors(cudaMemcpy(changed, &hchanged, sizeof(bool), cudaMemcpyHostToDevice));
 
-		clustering<<<grid_x, block_x>>>(edge_set, edge_num, cluster_name_, changed);
+		edgeBasedClustering<<<grid_x, block_x>>>(edge_set, edge_num, cluster_name_, changed);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 
@@ -306,7 +422,7 @@ void GpuEuclideanCluster2::extractClusters3()
 
 	gettimeofday(&end, NULL);
 
-	//std::cout << "Iteration time = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
+	std::cout << "Iteration time = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
 
 	int *count;
 
@@ -316,7 +432,7 @@ void GpuEuclideanCluster2::extractClusters3()
 	block_x = (point_num_ > block_size_x_) ? block_size_x_ : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
-	clusterCount<<<grid_x, block_x>>>(cluster_name_, count, point_num_);
+	clusterCount2<<<grid_x, block_x>>>(cluster_name_, count, point_num_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -327,15 +443,17 @@ void GpuEuclideanCluster2::extractClusters3()
 
 	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
 
-	checkCudaErrors(cudaFree(edge_count));
+	checkCudaErrors(cudaFree(sample_edge_set));
+	checkCudaErrors(cudaFree(mark));
 	checkCudaErrors(cudaFree(edge_set));
 	checkCudaErrors(cudaFree(changed));
 	checkCudaErrors(cudaFree(count));
 
 	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl;
+
 }
 
-void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &build_graph, long long &clustering_time, int &iteration_num)
+void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &build_graph, long long &clustering_time, int &iteration_num)
 {
 	total_time = build_graph = clustering_time = 0;
 	iteration_num = 0;
@@ -350,18 +468,15 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 	grid_x = (point_num_ - 1) / block_x + 1;
 
 
-	long long int *edge_count;
+	int2 *sample_edge_set;
 
 	gettimeofday(&start, NULL);
-	checkCudaErrors(cudaMalloc(&edge_count, sizeof(long long int) * (point_num_ + 1)));
-	checkCudaErrors(cudaMemset(edge_count, 0x00, sizeof(long long int) * (point_num_ + 1)));
 
+	checkCudaErrors(cudaMalloc(&sample_edge_set, sizeof(int2) * point_num_));
 
-	edgeCount<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3 + sizeof(long long int) * block_size_x_>>>(x_, y_, z_, point_num_, edge_count, threshold_);
+	sampleGraphBuild<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, sample_edge_set, threshold_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
-
-	long long int edge_num;
 
 	gettimeofday(&end, NULL);
 
@@ -369,16 +484,34 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 	total_time += timeDiff(start, end);
 	std::cout << "Count Edge Set = " << timeDiff(start, end) << std::endl;
 
-	GUtilities::exclusiveScan(edge_count, point_num_ + 1, &edge_num);
+	gettimeofday(&start, NULL);
+	int edge_num;
+	int *mark, *location;
+
+	checkCudaErrors(cudaMalloc(&mark, sizeof(int) * (point_num_ + 1)));
+
+	location = mark;
+
+	markInvalidEdge<<<grid_x, block_x>>>(sample_edge_set, point_num_, mark);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	GUtilities::exclusiveScan(mark, point_num_ + 1, &edge_num);
 
 	//std::cout << "Edge num = " << edge_num << std::endl;
 
+	gettimeofday(&end, NULL);
+
+	build_graph += timeDiff(start, end);
+	total_time += timeDiff(start, end);
 
 	if (edge_num == 0) {
-		checkCudaErrors(cudaFree(edge_count));
-		cluster_num_ = 0;
+		checkCudaErrors(cudaFree(sample_edge_set));
+		checkCudaErrors(cudaFree(mark));
+		cluster_num_ = point_num_;
 		return;
 	}
+
 
 	int2 *edge_set;
 
@@ -386,9 +519,18 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 
 	checkCudaErrors(cudaMalloc(&edge_set, sizeof(int2) * edge_num));
 
-	buildEdgeSet<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, edge_count, edge_set, threshold_, edge_num);
+	graphBuild<<<grid_x, block_x>>>(sample_edge_set, point_num_, location, edge_set);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+	gettimeofday(&end, NULL);
+
+	build_graph += timeDiff(start, end);
+	total_time += timeDiff(start, end);
+
+	std::cout << "Build Edge Set = " << timeDiff(start, end) << std::endl;
+
+	gettimeofday(&start, NULL);
 
 	bool *changed;
 	bool hchanged;
@@ -400,21 +542,12 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 
 	int itr = 0;
 
-	gettimeofday(&end, NULL);
-
-	build_graph += timeDiff(start, end);
-	total_time += timeDiff(start, end);
-
-	std::cout << "Build Edge Set = " << timeDiff(start, end) << std::endl;
-
-
-	gettimeofday(&start, NULL);
 	do {
 		hchanged = false;
 
 		checkCudaErrors(cudaMemcpy(changed, &hchanged, sizeof(bool), cudaMemcpyHostToDevice));
 
-		clustering<<<grid_x, block_x>>>(edge_set, edge_num, cluster_name_, changed);
+		edgeBasedClustering<<<grid_x, block_x>>>(edge_set, edge_num, cluster_name_, changed);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 
@@ -427,7 +560,7 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 	clustering_time += timeDiff(start, end);
 	total_time += timeDiff(start, end);
 	iteration_num = itr;
-	std::cout << "Iteration time = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
+	//std::cout << "Iteration time = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
 
 	int *count;
 
@@ -438,7 +571,7 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 	block_x = (point_num_ > block_size_x_) ? block_size_x_ : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
-	clusterCount<<<grid_x, block_x>>>(cluster_name_, count, point_num_);
+	clusterCount2<<<grid_x, block_x>>>(cluster_name_, count, point_num_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
@@ -449,7 +582,9 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 
 	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
 
-	checkCudaErrors(cudaFree(edge_count));
+
+	checkCudaErrors(cudaFree(sample_edge_set));
+	checkCudaErrors(cudaFree(mark));
 	checkCudaErrors(cudaFree(edge_set));
 	checkCudaErrors(cudaFree(changed));
 	checkCudaErrors(cudaFree(count));

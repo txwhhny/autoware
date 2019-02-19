@@ -33,7 +33,8 @@
 
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_clusters.h>
-#include <pcl/segmentation/conditional_euclidean_clustering.h>
+#include <pcl/segmentation/cocd .ditional_euclidean_clustering.h>
+
 
 #include <pcl/common/common.h>
 
@@ -409,7 +410,7 @@ std::vector<ClusterPtr> clusterAndColorGpu(const pcl::PointCloud<pcl::PointXYZ>:
 	if (method == EC_MATRIX_) {
 		gecl_cluster.extractClusters();
 	} else if (method == EC_EDGE_) {
-		gecl_cluster.extractClusters3();
+		gecl_cluster.extractClusters5();
 	} else {
 		gecl_cluster.extractClusters2();
 	}
@@ -429,9 +430,71 @@ std::vector<ClusterPtr> clusterAndColorGpu(const pcl::PointCloud<pcl::PointXYZ>:
 
 	return clusters;
 }
+
+
 #endif
 
 std::vector<ClusterPtr> clusterAndColor(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr out_cloud_ptr,
+		jsk_recognition_msgs::BoundingBoxArray& in_out_boundingbox_array,
+		autoware_msgs::centroids& in_out_centroids,
+		double in_max_cluster_distance=0.5)
+{
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
+
+	//create 2d pc
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_2d(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::copyPointCloud(*in_cloud_ptr, *cloud_2d);
+	//make it flat
+	for (size_t i=0; i<cloud_2d->points.size(); i++)
+	{
+		cloud_2d->points[i].z = 0;
+	}
+
+	if (cloud_2d->points.size() > 0)
+		tree->setInputCloud (cloud_2d);
+
+	std::vector<pcl::PointIndices> cluster_indices;
+
+	//perform clustering on 2d cloud
+	pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+	ec.setClusterTolerance (in_max_cluster_distance); //
+	ec.setMinClusterSize (_cluster_size_min);
+	ec.setMaxClusterSize (_cluster_size_max);
+	ec.setSearchMethod(tree);
+	ec.setInputCloud (cloud_2d);
+	ec.extract (cluster_indices);
+	//use indices on 3d cloud
+
+	/*pcl::ConditionalEuclideanClustering<pcl::PointXYZ> cec (true);
+	cec.setInputCloud (in_cloud_ptr);
+	cec.setConditionFunction (&independentDistance);
+	cec.setMinClusterSize (cluster_size_min);
+	cec.setMaxClusterSize (cluster_size_max);
+	cec.setClusterTolerance (_distance*2.0f);
+	cec.segment (cluster_indices);*/
+
+	/////////////////////////////////
+	//---	3. Color clustered points
+	/////////////////////////////////
+	unsigned int k = 0;
+	//pcl::PointCloud<pcl::PointXYZRGB>::Ptr final_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+	std::vector<ClusterPtr> clusters;
+	//pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZRGB>);//coord + color cluster
+	for (auto it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
+	{
+		ClusterPtr cluster(new Cluster());
+		cluster->SetCloud(in_cloud_ptr, it->indices, _velodyne_header, k, (int)_colors[k].val[0], (int)_colors[k].val[1], (int)_colors[k].val[2], "", _pose_estimation);
+		clusters.push_back(cluster);
+
+		k++;
+	}
+	return clusters;
+
+}
+
+std::vector<ClusterPtr> clusterAndColorGpuPcl(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
 		pcl::PointCloud<pcl::PointXYZRGB>::Ptr out_cloud_ptr,
 		jsk_recognition_msgs::BoundingBoxArray& in_out_boundingbox_array,
 		autoware_msgs::centroids& in_out_centroids,
@@ -634,34 +697,46 @@ void segmentByDistance(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
 
     points_num += cloud_segments_array[i]->points.size();
 	//if (_use_gpu) {
+    std::cout << "Matrix method" << std::endl;
     gettimeofday(&start, NULL);
 	local_clusters = clusterAndColorGpu(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, 1024, EC_MATRIX_, _clustering_thresholds[i]);
 	gettimeofday(&end, NULL);
 
 	m_total += timeDiff(start, end);
 
-//    gettimeofday(&start, NULL);
-//	local_clusters = clusterAndColorGpu(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, 1024, EC_EDGE_, _clustering_thresholds[i]);
-//	gettimeofday(&end, NULL);
-//
-//	e_total += timeDiff(start, end);
-//
-//    gettimeofday(&start, NULL);
-//	local_clusters = clusterAndColorGpu(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, 1024, EC_VERTEX_, _clustering_thresholds[i]);
-//	gettimeofday(&end, NULL);
-//
-//	v_total += timeDiff(start, end);
-//
-//	gettimeofday(&start, NULL);
-//	local_clusters = clusterAndColor(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, _clustering_thresholds[i]);
-//	gettimeofday(&end, NULL);
-//
-//	c_total += timeDiff(start, end);
+	std::cout << "Execution time = " << timeDiff(start, end) << std::endl;
 
-//	} else {
-//		local_clusters = clusterAndColor(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, _clustering_thresholds[i]);
-//
-//	}
+	std::cout << std::endl << "Edge method" << std::endl;
+    gettimeofday(&start, NULL);
+	local_clusters = clusterAndColorGpu(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, 1024, EC_EDGE_, _clustering_thresholds[i]);
+	gettimeofday(&end, NULL);
+
+	e_total += timeDiff(start, end);
+
+	std::cout << "Execution time = " << timeDiff(start, end) << std::endl;
+
+	std::cout << std::endl << "Vertex method" << std::endl;
+    gettimeofday(&start, NULL);
+	local_clusters = clusterAndColorGpu(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, 1024, EC_VERTEX_, _clustering_thresholds[i]);
+	gettimeofday(&end, NULL);
+
+	v_total += timeDiff(start, end);
+
+	std::cout << "Execution time = " << timeDiff(start, end) << std::endl;
+
+	std::cout << std::endl << "CPU method" << std::endl;
+	gettimeofday(&start, NULL);
+	local_clusters = clusterAndColor(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, _clustering_thresholds[i]);
+	gettimeofday(&end, NULL);
+
+	c_total += timeDiff(start, end);
+
+	std::cout << "Execution time = " << timeDiff(start, end) << std::endl;
+
+	} else {
+		local_clusters = clusterAndColor(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, _clustering_thresholds[i]);
+
+	}
 
 #else
 		std::vector<ClusterPtr> local_clusters = clusterAndColor(cloud_segments_array[i], out_cloud_ptr, in_out_boundingbox_array, in_out_centroids, _clustering_thresholds[i]);
@@ -672,15 +747,16 @@ void segmentByDistance(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
 	// Output result
 	//out_file << points_num << "," << e_total << "," << m_total << "," << v_total << "," << c_total << std::endl;
 
-	if (test_gpu) {
-		// GPUECTest::sparseGraphTest();
 
-		// GPUECTest::clusterNumVariationTest();
-
-		 GPUECTest::pointCloudVariationTest();
-
-		test_gpu = false;
-	}
+//	if (test_gpu) {
+//		// GPUECTest::sparseGraphTest();
+//
+//		// GPUECTest::clusterNumVariationTest();
+//
+//		 GPUECTest::pointCloudVariationTest();
+//
+//		test_gpu = false;
+//	}
 
 	//Clusters can be merged or checked in here
 	//....

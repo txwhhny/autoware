@@ -1,4 +1,5 @@
 #include "include/euclidean_cluster.h"
+#include "include/utilities.h"
 #include <cuda.h>
 
 #define NON_ATOMIC_ 1
@@ -417,40 +418,36 @@ __global__ void mergeForeignClusters(int *matrix, int *cluster_list,
 		*bchanged = false;
 	__syncthreads();
 
-	if (col < col_end && row_start < row_end) {
+	for (int row = row_start; row < row_end; row++) {
+		int rlabel = row - row_start;
+
+		tmp[threadIdx.x] = 0;
+		tmp[threadIdx.x + blockDim.x] = 0;
 		__syncthreads();
 
-		for (int row = row_start; row < row_end; row++) {
-			int rlabel = row - row_start;
-
-			tmp[threadIdx.x] = 0;
-			tmp[threadIdx.x + blockDim.x] = 0;
-			__syncthreads();
-
-			if (matrix[row * cluster_num + col] == 1) {
-				tmp[clabel] = 1;
-			}
-			__syncthreads();
-
-			if (tmp[clabel] == 1) {
-				clabel = rlabel + blockDim.x;
-				tchanged = true;
-			}
-			__syncthreads();
+		if (col < col_end && matrix[row * cluster_num + col] == 1) {
+			tmp[clabel] = 1;
 		}
-
 		__syncthreads();
 
-
-		if (tchanged) {
-			int new_cluster = cluster_list[row_start + clabel - blockDim.x];
-			__syncthreads();
-			cluster_list[col] = new_cluster;
-			*bchanged = true;
+		if (col < col_end && tmp[clabel] == 1) {
+			clabel = rlabel + blockDim.x;
+			tchanged = true;
 		}
+		__syncthreads();
 	}
 
 	__syncthreads();
+
+
+	if (tchanged) {
+		int new_cluster = cluster_list[row_start + clabel - blockDim.x];
+		__syncthreads();
+		cluster_list[col] = new_cluster;
+		*bchanged = true;
+	}
+	__syncthreads();
+
 	if (threadIdx.x == 0 && *bchanged)
 		*changed = true;
 }
@@ -492,15 +489,15 @@ __global__ void clusterIntersecCheck(int *matrix, int *changed_diag, int sub_mat
 	__syncthreads();
 
 	if (col < col_end && col_start < col_end && row_start < row_end) {
-		for (int row = row_start; row < row_end; row ++) {
+		for (int row = row_start; row < row_end; row++) {
 			if (matrix[row * cluster_num + col] != 0) {
 				schanged_diag = diag_offset;
 				break;
 			}
 		}
 	}
-
 	__syncthreads();
+
 	if (threadIdx.x == 0 && schanged_diag >= 0)
 		*changed_diag = schanged_diag;
 }
@@ -567,6 +564,21 @@ __global__ void rebuildMatrix(int *old_matrix, int *merged_cluster_list, int *ne
 	}
 }
 
+__global__ void rebuildMatrix2(int *old_matrix, int *merged_cluster_list, int *new_matrix, int *new_cluster_location, int old_cluster_num, int new_cluster_num)
+{
+	for (int col = threadIdx.x + blockIdx.x * blockDim.x; col < old_cluster_num; col += blockDim.x * gridDim.x) {
+		int new_col = new_cluster_location[merged_cluster_list[col]];
+
+		for (int row = 0; row < col; row++) {
+			int new_row = new_cluster_location[merged_cluster_list[row]];
+
+			if (old_matrix[row * old_cluster_num + col] != 0) {
+				new_matrix[new_row * new_cluster_num + new_col] = 1;
+			}
+		}
+	}
+}
+
 void GpuEuclideanCluster2::rebuildMatrixWrapper(int *old_matrix, int *merged_cluster_list,
 												int *new_matrix, int *new_cluster_location,
 												int old_cluster_num, int new_cluster_num)
@@ -579,7 +591,8 @@ void GpuEuclideanCluster2::rebuildMatrixWrapper(int *old_matrix, int *merged_clu
 	grid.y = GRID_SIZE_Y;
 	grid.z = 1;
 
-	rebuildMatrix<<<grid, block>>>(old_matrix, merged_cluster_list, new_matrix, new_cluster_location, old_cluster_num, cluster_num_);
+	//rebuildMatrix<<<grid, block>>>(old_matrix, merged_cluster_list, new_matrix, new_cluster_location, old_cluster_num, cluster_num_);
+	rebuildMatrix2<<<grid.x, block.x>>>(old_matrix, merged_cluster_list, new_matrix, new_cluster_location, old_cluster_num, cluster_num_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 }
@@ -636,7 +649,7 @@ void GpuEuclideanCluster2::extractClusters(long long &total_time, long long &ini
 	clusterMarkWrapper(cluster_name_, cluster_location, point_num_);
 
 	int new_cluster_num = 0;
-	exclusiveScan(cluster_location, point_num_ + 1, &new_cluster_num);
+	GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &new_cluster_num);
 
 	int *cluster_list;
 
@@ -703,6 +716,7 @@ void GpuEuclideanCluster2::extractClusters(long long &total_time, long long &ini
 			clusterIntersecCheckWrapper(matrix, changed_diag, &hchanged_diag, sub_matrix_size, sub_matrix_offset, cluster_num_);
 
 			if (hchanged_diag >= 0) {
+				std::cout << "Merge foreign clusters" << std::endl;
 				mergeForeignClustersWrapper(matrix, cluster_list, hchanged_diag, sub_matrix_size, sub_matrix_offset, cluster_num_, check);
 
 				checkCudaErrors(cudaMemcpy(&hcheck, check, sizeof(bool), cudaMemcpyDeviceToHost));
@@ -728,7 +742,7 @@ void GpuEuclideanCluster2::extractClusters(long long &total_time, long long &ini
 
 			int old_cluster_num = cluster_num_;
 
-			exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
+			GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
 
 			checkCudaErrors(cudaMalloc(&new_cluster_list, sizeof(int) * cluster_num_));
 
@@ -809,7 +823,7 @@ void GpuEuclideanCluster2::extractClusters()
 	clusterMarkWrapper(cluster_name_, cluster_location, point_num_);
 
 	int new_cluster_num = 0;
-	exclusiveScan(cluster_location, point_num_ + 1, &new_cluster_num);
+	GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &new_cluster_num);
 
 	int *cluster_list;
 
@@ -898,7 +912,7 @@ void GpuEuclideanCluster2::extractClusters()
 
 			int old_cluster_num = cluster_num_;
 
-			exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
+			GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
 
 			checkCudaErrors(cudaMalloc(&new_cluster_list, sizeof(int) * cluster_num_));
 

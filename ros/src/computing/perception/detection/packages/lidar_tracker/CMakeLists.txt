@@ -232,6 +232,7 @@ if (${CUDA_FOUND})
 				nodes/euclidean_cluster/euclidean_cluster/include/euclidean_cluster.h
 				nodes/euclidean_cluster/euclidean_cluster/common.cu
 				nodes/euclidean_cluster/euclidean_cluster/edge_based.cu
+				nodes/euclidean_cluster/euclidean_cluster/edge_based2.cu
 				nodes/euclidean_cluster/euclidean_cluster/vertex_based.cu
 				nodes/euclidean_cluster/euclidean_cluster/matrix_based.cu
 				nodes/euclidean_cluster/euclidean_cluster/sparse_matrix_based.cu

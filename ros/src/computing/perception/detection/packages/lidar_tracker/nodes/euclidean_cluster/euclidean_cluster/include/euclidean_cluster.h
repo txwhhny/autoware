@@ -28,11 +28,11 @@ public:
 	void extractClusters();
 	void extractClusters(long long &total_time, long long &initial_time, long long &build_matrix, long long &clustering_time, int &iteration_num);
 
-	// Vertex-based: Use adjacent list and atomic operations
+	// Vertex-based: full graph, use adjacent list and atomic operations
 	void extractClusters2();
 	void extractClusters2(long long &total_time, long long &graph_build_time, long long &clustering_time, int &iteration_num);
 
-	// Edge-based: Use edge set and atomic oprations
+	// Edge-based: Full graph, use edge set and atomic operations
 	void extractClusters3();
 	void extractClusters3(long long &total_time, long long &graph_build_time, long long &clustering_time, int &iteration_num);
 
@@ -40,8 +40,9 @@ public:
 	// the amount of memory needed
 	void extractClusters4();
 
-	// Not using matrix, direct inspect point coordinates only
-	void extractCluster5();
+	// Edge-based: Sample graph, use edge set and atomic operations
+	void extractClusters5();
+	void extractClusters5(long long &total_time, long long &graph_build_time, long long &clustering_time, int &iteration_num);
 
 	std::vector<GClusterIndex> getOutput();
 
@@ -52,15 +53,6 @@ public:
 
 private:
 	void initClusters();
-
-	void exclusiveScan(int *input, int ele_num, int *sum);
-
-	void exclusiveScan(long long int *input, int ele_num, long long int *sum);
-
-	void exclusiveScan(unsigned long long int *input, int ele_num, unsigned long long int *sum);
-
-	template <typename T = int>
-	void exclusiveScan(T *input, int ele_num, T *sum);
 
 	void renamingClusters(int *cluster_names, int *cluster_location, int point_num);
 

@@ -1,10 +1,7 @@
 #include "include/euclidean_cluster.h"
+#include "include/utilities.h"
 #include <cuda.h>
-#include <thrust/device_ptr.h>
-#include <thrust/device_vector.h>
-#include <thrust/copy.h>
-#include <thrust/scan.h>
-#include <thrust/fill.h>
+
 
 GpuEuclideanCluster2::GpuEuclideanCluster2()
 {
@@ -58,33 +55,6 @@ __global__ void convertFormat(pcl::PointXYZ *input, float *out_x, float *out_y, 
 		// Convert to 2d cloud
 		//out_z[i] = 0;
 	}
-}
-
-void GpuEuclideanCluster2::exclusiveScan(int *input, int ele_num, int *sum)
-{
-	exclusiveScan<int>(input, ele_num, sum);
-}
-
-void GpuEuclideanCluster2::exclusiveScan(long long int *input, int ele_num, long long int *sum)
-{
-	exclusiveScan<long long int>(input, ele_num, sum);
-}
-
-void GpuEuclideanCluster2::exclusiveScan(unsigned long long int *input, int ele_num, unsigned long long int *sum)
-{
-	exclusiveScan<unsigned long long int>(input, ele_num, sum);
-}
-
-template <typename T>
-void GpuEuclideanCluster2::exclusiveScan(T *input, int ele_num, T *sum)
-{
-	thrust::device_ptr<T> dev_ptr(input);
-
-	thrust::exclusive_scan(dev_ptr, dev_ptr + ele_num, dev_ptr);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());
-
-	*sum = *(dev_ptr + ele_num - 1);
 }
 
 void GpuEuclideanCluster2::setInputPoints(pcl::PointCloud<pcl::PointXYZ>::Ptr input)
@@ -321,7 +291,7 @@ float GpuEuclideanCluster2::density(){
 
 	int edge_num = 0;
 
-	exclusiveScan(edge_count, point_num_ + 1, &edge_num);
+	GUtilities::exclusiveScan(edge_count, point_num_ + 1, &edge_num);
 
 	std::cout << "Edge num = " << edge_num << std::endl;
 

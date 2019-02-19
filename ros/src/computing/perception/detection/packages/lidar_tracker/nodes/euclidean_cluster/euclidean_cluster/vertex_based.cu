@@ -1,4 +1,5 @@
 #include "include/euclidean_cluster.h"
+#include "include/utilities.h"
 #include <cuda.h>
 
 #define TEST_VERTEX_ 1
@@ -292,7 +293,7 @@ void GpuEuclideanCluster2::extractClusters2()
 
 	long long int adjacent_list_size;
 
-	exclusiveScan(adjacent_count, point_num_ + 1, &adjacent_list_size);
+	GUtilities::exclusiveScan(adjacent_count, point_num_ + 1, &adjacent_list_size);
 
 
 	if (adjacent_list_size == 0) {
@@ -378,7 +379,7 @@ void GpuEuclideanCluster2::extractClusters2()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
+	GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
 
 	renamingClusters(cluster_name_, cluster_location, point_num_);
 
@@ -427,7 +428,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
-	//std::cout << "Count ADJ = " << timeDiff(start, end) << std::endl;
+	std::cout << "Count ADJ = " << timeDiff(start, end) << std::endl;
 #endif
 
 	long long int adjacent_list_size;
@@ -435,7 +436,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 #ifdef TEST_VERTEX_
 	gettimeofday(&start, NULL);
 #endif
-	exclusiveScan(adjacent_count, point_num_ + 1, &adjacent_list_size);
+	GUtilities::exclusiveScan(adjacent_count, point_num_ + 1, &adjacent_list_size);
 #ifdef TEST_VERTEX_
 	gettimeofday(&end, NULL);
 
@@ -465,7 +466,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
-	//std::cout << "Build ADJ = " << timeDiff(start, end) << std::endl;
+	std::cout << "Build ADJ = " << timeDiff(start, end) << std::endl;
 #endif
 
 	bool *changed;
@@ -515,7 +516,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 
 	clustering_time += timeDiff(start, end);
 	total_time += timeDiff(start, end);
-	//std::cout << "Iteration = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
+	std::cout << "Iteration = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
 	iteration_num = itr;
 #endif
 
@@ -531,7 +532,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
+	GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
 
 	renamingClusters(cluster_name_, cluster_location, point_num_);
 
