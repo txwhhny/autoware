@@ -1,4 +1,7 @@
 #include "include/voxel_grid.h"
+#include "include/utilities.h"
+#include <cfloat>
+#include <iostream>
 
 #define BLOCK_SIZE_X (1024)
 
@@ -26,30 +29,47 @@ GVoxelGrid::GVoxelGrid():
 	vgrid_x_(0),
 	vgrid_y_(0),
 	vgrid_z_(0),
-	points_per_voxel_(NULL),
+	voxel_ids_(NULL),
 	starting_point_ids_(NULL),
 	point_ids_(NULL)
 {
 }
 
+__global__ void initPointIds(int *point_ids, int point_num)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
+		point_ids[i] = i;
+	}
+}
+
 // x, y, z are GPU buffers
-GVoxelGrid::GVoxelGrid(float *x, float *y, float *z, int point_num)
+GVoxelGrid::GVoxelGrid(float *x, float *y, float *z, int point_num, float voxel_x, float voxel_y, float voxel_z)
 {
 	x_ = x;
 	y_ = y;
 	z_ = z;
 	point_num_ = point_num;
+	voxel_x_ = voxel_x;
+	voxel_y_ = voxel_y;
+	voxel_z_ = voxel_z;
+	voxel_ids_ = NULL;
 
-	findBoundaries();
+	checkCudaErrors(cudaMalloc(&point_ids_, sizeof(int) * point_num_));
 
-	// Allocate empty voxel grid
-	voxel_num_ = vgrid_x_ * vgrid_y_ * vgrid_z_;
+	int block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
+	int grid_x = (point_num_ - 1) / block_x + 1;
 
-	checkCudaErrors(cudaMalloc(&points_per_voxel_, sizeof(int) * voxel_num_));
-	checkCudaErrors(cudaMemset(points_per_voxel_, 0, sizeof(int) * voxel_num_));
+	initPointIds<<<grid_x, block_x>>>(point_ids_, point_num_);
+	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	checkCudaErrors(cudaMalloc(&starting_point_ids_, sizeof(int) * (voxel_num_ + 1)));
+	struct timeval start, end;
+
+	gettimeofday(&start, NULL);
+	findBoundaries();
+	gettimeofday(&end, NULL);
+
+	// Allocate empty voxel grid
 
 	insertPointsToVoxels();
 
@@ -137,6 +157,7 @@ void GVoxelGrid::findBoundaries()
 	vgrid_y_ = max_b_y_ - min_b_y_ + 1;
 	vgrid_z_ = max_b_z_ - min_b_z_ + 1;
 
+
 	checkCudaErrors(cudaFree(max_x));
 	checkCudaErrors(cudaFree(max_y));
 	checkCudaErrors(cudaFree(max_z));
@@ -158,92 +179,523 @@ __device__ int voxelId(float x, float y, float z,
 	return (id_x + id_y * vgrid_x + id_z * vgrid_x * vgrid_y);
 }
 
-__global__ void countPointsPerVoxel(float *x, float *y, float *z, int point_num, int *points_per_voxel, int voxel_num,
-										int vgrid_x, int vgrid_y, int vgrid_z,
-										float voxel_x, float voxel_y, float voxel_z,
-										int min_b_x, int min_b_y, int min_b_z)
+__global__ void computeVoxelId(float *x, float *y, float *z, int point_num,
+								int *vid_of_point,
+								int vgrid_x, int vgrid_y, int vgrid_z,
+								float voxel_x, float voxel_y, float voxel_z,
+								int min_b_x, int min_b_y, int min_b_z)
 {
 	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
-		int voxel_id = voxelId(x[i], y[i], z[i], voxel_x, voxel_y, voxel_z, min_b_x, min_b_y, min_b_z, vgrid_x, vgrid_y, vgrid_z);
-
-		atomicAdd(points_per_voxel + voxel_id, 1);
+		vid_of_point[i] = voxelId(x[i], y[i], z[i], voxel_x, voxel_y, voxel_z, min_b_x, min_b_y, min_b_z, vgrid_x, vgrid_y, vgrid_z);
 	}
 }
 
-__global__ void insertPointsToGrid(float *x, float *y, float *z, int point_num, int voxel_num,
-									int vgrid_x, int vgrid_y, int vgrid_z,
-									float voxel_x, float voxel_y, float voxel_z,
-									int min_b_x, int min_b_y, int min_b_z,
-									int *writing_location, int *point_ids)
+__global__ void markNonEmptyVoxels(int *vid_of_point, int point_num, int *mark)
 {
-	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < points_num; i += blockDim.x * gridDim.x) {
-		int voxel_id = voxelId(x[i], y[i], z[i], voxel_x, voxel_y, voxel_z,
-								min_b_x, min_b_y, min_b_z, vgrid_x, vgrid_y, vgrid_z);
+	int i;
 
-		int loc = atomicAdd(writing_locations + voxel_id, 1);
+	for (i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num - 1; i += blockDim.x * gridDim.x) {
+		mark[i] = (vid_of_point[i] < vid_of_point[i + 1]) ? 1 : 0;
+	}
 
-		point_ids[loc] = i;
+	if (i == point_num - 1) {
+		mark[i] = 1;
+	}
+}
+
+__global__ void collectNonEmptyVoxels(int *vid_of_point, int point_num, int *writing_location,
+										int *voxel_ids, int *starting_point_ids)
+{
+	int i, loc;
+
+	for (i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num - 1; i += blockDim.x * gridDim.x) {
+		if (vid_of_point[i] < vid_of_point[i + 1]) {
+			loc = writing_location[i];
+
+			voxel_ids[loc] = vid_of_point[i];
+			starting_point_ids[loc + 1] = i + 1;
+		}
+	}
+
+	if (threadIdx.x + blockIdx.x * blockDim.x == 0) {
+		starting_point_ids[0] = 0;
+	}
+
+	if (i == point_num - 1) {
+		loc = writing_location[i];
+
+		voxel_ids[loc] = vid_of_point[i];
+		starting_point_ids[loc + 1] = i + 1;
 	}
 }
 
 
 void GVoxelGrid::insertPointsToVoxels()
 {
-	if (starting_point_ids_ != NULL) {
-		checkCudaErrors(cudaFree(starting_point_ids_));
-		starting_point_ids_ = NULL;
-	}
-
-	if (point_ids_ != NULL) {
-		checkCudaErrors(cudaFree(point_ids_));
-		point_ids_ = NULL;
-	}
-
 	int block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
 	int grid_x = (point_num_ - 1) / block_x + 1;
 
-	countPointsPerVoxel<<<grid_x, block_x>>>(x_, y_, z_, point_num_, points_per_voxel_, voxel_num_,
-												vgrid_x_, vgrid_y_, vgrid_z_,
-												voxel_x_, voxel_y_, voxel_z_,
-												min_b_x_, min_b_y_, min_b_z_);
+	int *vid_of_point;
+
+	checkCudaErrors(cudaMalloc(&vid_of_point, sizeof(int) * point_num_));
+
+	computeVoxelId<<<grid_x, block_x>>>(x_, y_, z_, point_num_,	vid_of_point,
+											vgrid_x_, vgrid_y_, vgrid_z_,
+											voxel_x_, voxel_y_, voxel_z_,
+											min_b_x_, min_b_y_, min_b_z_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	checkCudaErrors(cudaMemcpy(starting_point_ids_, points_per_voxel_, sizeof(int) * voxel_num_, cudaMemcpyDeviceToDevice));
+	GUtilities::sortByKey(vid_of_point, point_ids_, point_num_);
 
-	GUtilities::exclusiveScan(starting_point_ids_, voxel_num_ + 1);
+	int *mark;
 
-	int *writing_location;
+	checkCudaErrors(cudaMalloc(&mark, sizeof(int) * (point_num_ + 1)));
 
-	checkCudaErrors(cudaMalloc(&writing_location, sizeof(int) * voxel_num_));
-	checkCudaErrors(cudaMemcpy(writing_location, starting_point_ids_, sizeof(int) * voxel_num_, cudaMemcpyDeviceToDevice));
-
-	checkCudaErrors(cudaMalloc(&point_ids_, sizeof(int) * point_num_));
-
-	insertPointsToGrid<<<grid_x, block_x>>>(x_, y_, z_, point_num_, voxel_num_,
-												vgrid_x_, vgrid_y_, vgrid_z_,
-												voxel_x_, voxel_y_, voxel_z_,
-												min_b_x_, min_b_y_, min_b_z_,
-												writing_location, point_ids_);
+	markNonEmptyVoxels<<<grid_x, block_x>>>(vid_of_point, point_num_, mark);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	checkCudaErrors(cudaFree(writing_location));
+	GUtilities::exclusiveScan(mark, point_num_ + 1, &voxel_num_);
+
+	checkCudaErrors(cudaMalloc(&voxel_ids_, sizeof(int) * voxel_num_));
+	checkCudaErrors(cudaMalloc(&starting_point_ids_, sizeof(int) * (voxel_num_ + 1)));
+
+	collectNonEmptyVoxels<<<grid_x, block_x>>>(vid_of_point, point_num_, mark, voxel_ids_, starting_point_ids_);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	checkCudaErrors(cudaFree(vid_of_point));
+	checkCudaErrors(cudaFree(mark));
 }
 
-void GVoxelGrid::radiusSearch(int2 *nearest_neighbors)
+
+// Return the index of vid in the voxel id list. Return -1 if not found.
+__device__ int voxelSearch(int *voxel_ids, int voxel_num, int vid)
 {
-	int block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
-	int grid_x = (point_num_ - 1) / block_x + 1;
+	int left = 0, right = voxel_num - 1;
+	int middle;
 
-	int *max_vid_x, *max_vid_y, *max_vid_z;
-	int *min_vid_x, *min_vid_y, *min_vid_z;
+	while (left <= right) {
+		middle = (left + right) / 2;
+		int candidate = voxel_ids[middle];
 
-	checkCudaErrors(cudaMalloc(&max_vid_x, sizeof(int) * point_num_));
-	checkCudaErrors(cudaMalloc(&max_vid_y, sizeof(int) * point_num_));
-	checkCudaErrors(cudaMalloc(&max_vid_z, sizeof(int) * point_num_));
+		if (vid == candidate) {
+			return middle;
+		}
 
-	checkCudaErrors(cudaMalloc(&min_vid_x, sizeof(int) * point_num_));
-	checkCudaErrors(cudaMalloc(&min_vid_y, sizeof(int) * point_num_));
-	checkCudaErrors(cudaMalloc(&min_vid_z, sizeof(int) * point_num_));
+		left = (vid > candidate) ? middle + 1 : left;
+		right = (vid < candidate) ? middle - 1 : right;
+	}
+
+	return -1;
+}
+__global__ void boundariesSearch(float *x, float *y, float *z, int point_num, float radius,
+									int vgrid_x, int vgrid_y, int vgrid_z,
+									float voxel_x, float voxel_y, float voxel_z,
+									int max_b_x, int max_b_y, int max_b_z,
+									int min_b_x, int min_b_y, int min_b_z,
+									int *voxel_ids, int voxel_num,
+									int *candidate_vids)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
+		float tx = x[i];
+		float ty = y[i];
+		float tz = z[i];
+
+		int max_id_x = static_cast<int>(floorf((tx + radius) / voxel_x));
+		int max_id_y = static_cast<int>(floorf((ty + radius) / voxel_y));
+		int max_id_z = static_cast<int>(floorf((tz + radius) / voxel_z));
+
+		int min_id_x = static_cast<int>(floorf((tx - radius) / voxel_x));
+		int min_id_y = static_cast<int>(floorf((ty - radius) / voxel_y));
+		int min_id_z = static_cast<int>(floorf((tz - radius) / voxel_z));
+
+		max_id_x = (max_id_x > max_b_x) ? max_b_x - min_b_x : max_id_x - min_b_x;
+		max_id_y = (max_id_y > max_b_y) ? max_b_y - min_b_y : max_id_y - min_b_y;
+		max_id_z = (max_id_z > max_b_z) ? max_b_z - min_b_z : max_id_z - min_b_z;
+
+		min_id_x = (min_id_x < min_b_x) ? 0 : min_id_x - min_b_x;
+		min_id_y = (min_id_y < min_b_y) ? 0 : min_id_y - min_b_y;
+		min_id_z = (min_id_z < min_b_z) ? 0 : min_id_z - min_b_z;
+
+		// Number of candidate voxels
+		int voxel_count = 0;
+
+		for (int j = min_id_x; j <= max_id_x; j++) {
+			for (int k = min_id_y; k <= max_id_y; k++) {
+				for (int l = min_id_z; l <= max_id_z; l++) {
+					int vid = j + k * vgrid_x + l * vgrid_x * vgrid_y;
+
+					candidate_vids[i + point_num * voxel_count] = voxelSearch(voxel_ids, voxel_num, vid);
+					voxel_count++;
+				}
+			}
+		}
+	}
+}
+
+__global__ void initCandidateVids(int *candidate_vids, int size)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < size; i += blockDim.x * gridDim.x) {
+		candidate_vids[i] = -1;
+	}
+}
+
+__global__ void neighborsCount(float *x, float *y, float *z, int point_num,
+								int *candidate_vids,
+								int *starting_point_ids, int *point_ids,
+								int *neighbor_count,
+								float threshold, bool search_all)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
+		float tx = x[i];
+		float ty = y[i];
+		float tz = z[i];
+		int count = 0;
+
+		for (int candidate_num = 0; candidate_num < 27; candidate_num++) {
+			int vid = candidate_vids[i + candidate_num * point_num];
+
+			if (vid >= 0) {
+				int pid_start = starting_point_ids[vid];
+				int pid_end = starting_point_ids[vid + 1];
+
+				for (int k = pid_start; k < pid_end; k++) {
+					int pid = point_ids[k];
+
+					if (search_all) {
+						if (i != pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+							count++;
+						}
+					} else {
+						if (i < pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+							count++;
+						}
+					}
+				}
+			}
+		}
+
+		__syncthreads();
+
+		neighbor_count[i] = count;
+	}
+}
+
+__global__ void neighborsSearch(float *x, float *y, float *z, int point_num,
+									int *candidate_vids,
+									int *starting_point_ids, int *point_ids,
+									int *starting_neighbor_ids, int *neighbor_ids,
+									float threshold, bool search_all)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
+		float tx = x[i];
+		float ty = y[i];
+		float tz = z[i];
+		int location = starting_neighbor_ids[i];
+
+		for (int candidate_num = 0; candidate_num < 27; candidate_num++) {
+			int vid = candidate_vids[i + candidate_num * point_num];
+
+			if (vid >= 0) {
+				int pid_start = starting_point_ids[vid];
+				int pid_end = starting_point_ids[vid + 1];
+
+				for (int k = pid_start; k < pid_end; k++) {
+					int pid = point_ids[k];
+
+					if (search_all) {
+						if (i != pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+							neighbor_ids[location++] = pid;
+						}
+					} else {
+						if (i < pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+							neighbor_ids[location++] = pid;
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, int *neighbor_num, float radius, bool search_all)
+{
+	int block_x, grid_x;
+
+
+	int *candidate_vids;
+
+	checkCudaErrors(cudaMalloc(&candidate_vids, sizeof(int) * (point_num_ * 27)));
+
+	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
+	grid_x = (point_num_ * 27 - 1) / block_x + 1;
+
+	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
+	grid_x = (point_num_ - 1) / block_x + 1;
+
+	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
+											vgrid_x_, vgrid_y_, vgrid_z_,
+											voxel_x_, voxel_y_, voxel_z_,
+											max_b_x_, max_b_y_, max_b_z_,
+											min_b_x_, min_b_y_, min_b_z_,
+											voxel_ids_, voxel_num_,
+											candidate_vids);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	checkCudaErrors(cudaMalloc(starting_neighbor_ids, sizeof(int) * (point_num_ + 1)));
+
+
+	neighborsCount<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
+											candidate_vids,
+											starting_point_ids_, point_ids_,
+											*starting_neighbor_ids, radius, search_all);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	GUtilities::exclusiveScan(*starting_neighbor_ids, point_num_ + 1, neighbor_num);
+
+	if (*neighbor_num == 0) {
+		checkCudaErrors(cudaFree(candidate_vids));
+		checkCudaErrors(cudaFree(*starting_neighbor_ids));
+		*starting_neighbor_ids = NULL;
+		*neighbor_ids = NULL;
+
+		return;
+	}
+
+	checkCudaErrors(cudaMalloc(neighbor_ids, sizeof(int) * (*neighbor_num)));
+
+	neighborsSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
+											candidate_vids,
+											starting_point_ids_, point_ids_,
+											*starting_neighbor_ids,
+											*neighbor_ids,
+											radius, search_all);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	checkCudaErrors(cudaFree(candidate_vids));
+}
+
+
+__global__ void edgeSetBuild(float *x, float *y, float *z, int point_num,
+								int *candidate_vids,
+								int *starting_point_ids, int *point_ids,
+								int *starting_neighbor_ids, int2 *edge_set,
+								float threshold)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
+		float tx = x[i];
+		float ty = y[i];
+		float tz = z[i];
+		int location = starting_neighbor_ids[i];
+		int2 val;
+
+		val.x = i;
+
+		for (int candidate_num = 0; candidate_num < 27; candidate_num++) {
+			int vid = candidate_vids[i + candidate_num * point_num];
+
+			if (vid >= 0) {
+				int pid_start = starting_point_ids[vid];
+				int pid_end = starting_point_ids[vid + 1];
+
+				for (int k = pid_start; k < pid_end; k++) {
+					int pid = point_ids[k];
+
+					if (i < pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+						val.y = pid;
+						edge_set[location++] = val;
+					}
+				}
+			}
+		}
+	}
+}
+
+
+/* Basically perform a radius search and
+ * record the result into edge_set
+ */
+void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
+{
+	int block_x, grid_x;
+
+
+	int *candidate_vids;
+
+	checkCudaErrors(cudaMalloc(&candidate_vids, sizeof(int) * (point_num_ * 27)));
+
+	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
+	grid_x = (point_num_ * 27 - 1) / block_x + 1;
+
+	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
+	grid_x = (point_num_ - 1) / block_x + 1;
+
+	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
+											vgrid_x_, vgrid_y_, vgrid_z_,
+											voxel_x_, voxel_y_, voxel_z_,
+											max_b_x_, max_b_y_, max_b_z_,
+											min_b_x_, min_b_y_, min_b_z_,
+											voxel_ids_, voxel_num_,
+											candidate_vids);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	int *starting_neighbor_ids;
+
+	checkCudaErrors(cudaMalloc(&starting_neighbor_ids, sizeof(int) * (point_num_ + 1)));
+
+
+	neighborsCount<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
+											candidate_vids,
+											starting_point_ids_, point_ids_,
+											starting_neighbor_ids, radius, false);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	GUtilities::exclusiveScan(starting_neighbor_ids, point_num_ + 1, edge_num);
+
+	if (*edge_num == 0) {
+		checkCudaErrors(cudaFree(candidate_vids));
+		checkCudaErrors(cudaFree(starting_neighbor_ids));
+		*edge_set = NULL;
+
+		return;
+	}
+
+	checkCudaErrors(cudaMalloc(edge_set, sizeof(int2) * (*edge_num)));
+
+	edgeSetBuild<<<grid_x, block_x>>>(x_, y_, z_, point_num_, candidate_vids,
+										starting_point_ids_, point_ids_,
+										starting_neighbor_ids, *edge_set,
+										radius);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	checkCudaErrors(cudaFree(candidate_vids));
+	checkCudaErrors(cudaFree(starting_neighbor_ids));
+}
+
+void GVoxelGrid::createAdjacentList(int **starting_neighbor_ids, int **adjacent_list, int *list_size, float radius)
+{
+	radiusSearch(starting_neighbor_ids, adjacent_list, list_size, radius, true);
+}
+
+__global__ void matrixBuild(float *x, float *y, float *z, int point_num,
+							int *candidate_vids,
+							int *starting_point_ids, int *point_ids,
+							int *point_labels, int label_num,
+							int *matrix, bool *is_zero, float threshold)
+{
+	bool t_is_zero = true;
+
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
+		float tx = x[i];
+		float ty = y[i];
+		float tz = z[i];
+		int col = point_labels[i];
+
+		for (int candidate_num = 0; candidate_num < 27; candidate_num++) {
+			int vid = candidate_vids[i + candidate_num * point_num];
+
+			if (vid >= 0) {
+				int pid_start = starting_point_ids[vid];
+				int pid_end = starting_point_ids[vid + 1];
+
+				for (int k = pid_start; k < pid_end; k++) {
+					int pid = point_ids[k];
+					int row = point_labels[pid];
+
+					if (row < col && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+						matrix[row * label_num + col] = 1;
+						t_is_zero = false;
+					}
+				}
+			}
+		}
+	}
+
+	if (!t_is_zero) {
+		*is_zero = false;
+	}
+}
+
+void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **matrix, bool *is_zero, float radius)
+{
+	if (label_num == 0) {
+		*matrix = NULL;
+		return;
+	}
+
+	checkCudaErrors(cudaMalloc(matrix, sizeof(int) * label_num * label_num));
+	checkCudaErrors(cudaMemset(*matrix, 0, sizeof(int) * label_num * label_num));
+
+	// neighbor search and set to matrix
+	int block_x, grid_x;
+
+	int *candidate_vids;
+
+	checkCudaErrors(cudaMalloc(&candidate_vids, sizeof(int) * (point_num_ * 27)));
+
+	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
+	grid_x = (point_num_ * 27 - 1) / block_x + 1;
+
+	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
+	grid_x = (point_num_ - 1) / block_x + 1;
+
+	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
+											vgrid_x_, vgrid_y_, vgrid_z_,
+											voxel_x_, voxel_y_, voxel_z_,
+											max_b_x_, max_b_y_, max_b_z_,
+											min_b_x_, min_b_y_, min_b_z_,
+											voxel_ids_, voxel_num_,
+											candidate_vids);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	bool *g_is_zero;
+
+	checkCudaErrors(cudaMalloc(&g_is_zero, sizeof(bool)));
+
+	*is_zero = true;
+
+	checkCudaErrors(cudaMemcpy(g_is_zero, is_zero, sizeof(bool), cudaMemcpyHostToDevice));
+
+	matrixBuild<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
+										candidate_vids,
+										starting_point_ids_, point_ids_,
+										point_labels, label_num, *matrix, g_is_zero, radius);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+
+	checkCudaErrors(cudaMemcpy(is_zero, g_is_zero, sizeof(bool), cudaMemcpyDeviceToHost));
+
+	checkCudaErrors(cudaFree(candidate_vids));
+	checkCudaErrors(cudaFree(g_is_zero));
+}
+
+
+GVoxelGrid::~GVoxelGrid()
+{
+	checkCudaErrors(cudaFree(voxel_ids_));
+	checkCudaErrors(cudaFree(starting_point_ids_));
+	checkCudaErrors(cudaFree(point_ids_));
+
+	x_ = y_ = z_ = NULL;
 }

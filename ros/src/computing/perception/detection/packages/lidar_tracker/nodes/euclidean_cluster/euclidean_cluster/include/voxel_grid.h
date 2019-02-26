@@ -1,3 +1,6 @@
+#ifndef EUCLIDEAN_VGRID_H_
+#define EUCLIDEAN_VGRID_H_
+
 #include <cuda.h>
 
 
@@ -5,16 +8,39 @@ class GVoxelGrid {
 public:
 	GVoxelGrid();
 
-	GVoxelGrid(float *x, float *y, float *z, int point_num);
+	GVoxelGrid(float *x, float *y, float *z, int point_num,
+				float voxel_x, float voxel_y, float voxel_z);
 
 	void buildGrid();
 
 	/* Customized radiusSearch():
-	 * For every point q, search for two nearest neighbors.
-	 * One has index larger than q, one has index smaller than q.
-	 * If no such point exist, record -1
+	 * For each point pid, search for its neighbors.
+	 * If search_all = true, search for all of its neighbors.
+	 * If search_all = false, only search for neighbors whose indexes is larger than pid.
+	 * By default, search_all = false.
 	 */
-	void radiusSearch(int2 *nearest_neighbors);
+	void radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, int *neighbor_num, float radius, bool search_all = false);
+
+	/* Produce a graph in the form of an edge set from the cloud.
+	 * Each vertex is a point.
+	 * An edge connects two points whose distance is less than radius.
+	 */
+	void createEdgeSet(int2 **edge_set, int *edge_num, float radius);
+
+	/* Produce a graph in the form of an adjacent list from the cloud.
+	 * Each vertex is a point.
+	 * An edge connects two points whose distance is less than radius.
+	 */
+	void createAdjacentList(int **starting_neighbor_ids, int **adjacent_list, int *list_size, float radius);
+
+	/* Produce a matrix that describes the relationship
+	 * between clusters of points. is_zero is set if
+	 * the matrix is zero, so we may not have to traverse through
+	 * the matrix for clustering.
+	 */
+	void createLabeledMatrix(int *point_labels, int label_num, int **matrix, bool *is_zero, float radius);
+
+	~GVoxelGrid();
 
 private:
 
@@ -32,7 +58,9 @@ private:
 	int min_b_x_, min_b_y_, min_b_z_;
 	int vgrid_x_, vgrid_y_, vgrid_z_;
 
-	int *points_per_voxel_;
+	int *voxel_ids_;
 	int *starting_point_ids_;
 	int *point_ids_;
 };
+
+#endif

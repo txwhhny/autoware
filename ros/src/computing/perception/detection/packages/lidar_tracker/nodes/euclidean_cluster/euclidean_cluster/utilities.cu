@@ -4,7 +4,17 @@
 #include <thrust/copy.h>
 #include <thrust/scan.h>
 #include <thrust/fill.h>
+#include <thrust/sort.h>
 
+
+void GUtilities::inclusiveScan(int *input, int ele_num)
+{
+	thrust::device_ptr<int> dev_ptr(input);
+
+	thrust::inclusive_scan(dev_ptr, dev_ptr + ele_num, dev_ptr);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+}
 
 void GUtilities::exclusiveScan(int *input, int ele_num)
 {
@@ -48,3 +58,21 @@ void GUtilities::exclusiveScan(T *input, int ele_num)
 	checkCudaErrors(cudaDeviceSynchronize());
 }
 
+void GUtilities::sort(int *input, int ele_num)
+{
+	thrust::device_ptr<int> dev_ptr(input);
+
+	thrust::sort(dev_ptr, dev_ptr + ele_num);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+}
+
+void GUtilities::sortByKey(int *key, int *value, int ele_num)
+{
+	thrust::device_ptr<int> dev_key(key);
+	thrust::device_ptr<int> dev_val(value);
+
+	thrust::sort_by_key(dev_key, dev_key + ele_num, dev_val);
+	checkCudaErrors(cudaGetLastError());
+	checkCudaErrors(cudaDeviceSynchronize());
+}

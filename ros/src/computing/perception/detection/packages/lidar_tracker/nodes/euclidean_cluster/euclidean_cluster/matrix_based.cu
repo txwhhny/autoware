@@ -388,6 +388,8 @@ void GpuEuclideanCluster2::mergeLocalClustersWrapper(int *cluster_list, int *mat
 		block_x = block_size_x_;
 		grid_x = active_block_num;
 
+		std::cout << "Primary foreign clustering" << std::endl;
+
 		foreignClustering<<<grid_x, block_x, sizeof(int) * 2 * block_size_x_ + sizeof(bool)>>>(matrix, cluster_list, 0, 1, 2, cluster_num, changed);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
@@ -617,6 +619,7 @@ void GpuEuclideanCluster2::blockClusteringWrapper(float *x, float *y, float *z, 
 
 void GpuEuclideanCluster2::extractClusters(long long &total_time, long long &initial_time, long long &build_matrix, long long &clustering_time, int &iteration_num)
 {
+	std::cout << "MATRIX-BASED 1" << std::endl;
 	total_time = initial_time = build_matrix = clustering_time = 0;
 
 	struct timeval start, end;
@@ -790,168 +793,13 @@ void GpuEuclideanCluster2::extractClusters(long long &total_time, long long &ini
 
 	total_time += timeDiff(start, end);
 
-	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl;
+	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
 }
 
 void GpuEuclideanCluster2::extractClusters()
 {
-	struct timeval start, end;
+	long long total_time, initial_time, build_matrix, clustering_time;
+	int iteration_num;
 
-	// Initialize names of clusters
-	initClusters();
-
-	bool *check;
-	bool hcheck = false;
-
-	checkCudaErrors(cudaMalloc(&check, sizeof(bool)));
-	checkCudaErrors(cudaMemcpy(check, &hcheck, sizeof(bool), cudaMemcpyHostToDevice));
-
-	gettimeofday(&start, NULL);
-	blockClusteringWrapper(x_, y_, z_, point_num_, cluster_name_, threshold_);
-	gettimeofday(&end, NULL);
-
-	std::cout << "blockClustering = " << timeDiff(start, end) << std::endl;
-
-	// Collect the remaining clusters
-	// Locations of clusters in the cluster list
-	int *cluster_location;
-
-	gettimeofday(&start, NULL);
-	checkCudaErrors(cudaMalloc(&cluster_location, sizeof(int) * (point_num_ + 1)));
-	checkCudaErrors(cudaMemset(cluster_location, 0, sizeof(int) * (point_num_ + 1)));
-
-	clusterMarkWrapper(cluster_name_, cluster_location, point_num_);
-
-	int new_cluster_num = 0;
-	GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &new_cluster_num);
-
-	int *cluster_list;
-
-	checkCudaErrors(cudaMalloc(&cluster_list, sizeof(int) * new_cluster_num));
-
-	clusterCollectorWrapper(cluster_list, new_cluster_num);
-
-	gettimeofday(&end, NULL);
-
-	std::cout << "Collect remaining clusters: " << timeDiff(start, end) << std::endl;
-
-	cluster_num_ = new_cluster_num;
-
-	gettimeofday(&start, NULL);
-	// Build relation matrix which describe the current relationship between clusters
-	int *matrix;
-
-	checkCudaErrors(cudaMalloc(&matrix, sizeof(int) * cluster_num_ * cluster_num_));
-	checkCudaErrors(cudaMemset(matrix, 0, sizeof(int) * cluster_num_ * cluster_num_));
-	checkCudaErrors(cudaDeviceSynchronize());
-
-	gettimeofday(&end, NULL);
-
-	std::cout << "Malloc and memset = " << timeDiff(start, end) << std::endl;
-
-	gettimeofday(&start, NULL);
-	buildClusterMatrixWrapper(x_, y_, z_, cluster_name_,
-								cluster_location, matrix,
-								point_num_, cluster_num_,
-								threshold_);
-	gettimeofday(&end, NULL);
-
-	std::cout << "Build RC and Matrix = " << timeDiff(start, end) << std::endl;
-
-	int *changed_diag;
-	int hchanged_diag;
-	checkCudaErrors(cudaMalloc(&changed_diag, sizeof(int)));
-
-	int *new_cluster_list;
-
-	gettimeofday(&start, NULL);
-	int itr = 0;
-
-	do {
-		hcheck = false;
-		hchanged_diag = -1;
-
-		checkCudaErrors(cudaMemcpy(check, &hcheck, sizeof(bool), cudaMemcpyHostToDevice));
-
-		mergeLocalClustersWrapper(cluster_list, matrix, cluster_num_, check);
-
-		int sub_matrix_size = 2;
-		int sub_matrix_offset = 4;
-
-		checkCudaErrors(cudaMemcpy(&hcheck, check, sizeof(bool), cudaMemcpyDeviceToHost));
-
-		int inner_itr_num = 0;
-
-		while (!(hcheck) && sub_matrix_size * block_size_x_ < cluster_num_ && cluster_num_ > block_size_x_) {
-
-			clusterIntersecCheckWrapper(matrix, changed_diag, &hchanged_diag, sub_matrix_size, sub_matrix_offset, cluster_num_);
-
-			if (hchanged_diag >= 0) {
-				mergeForeignClustersWrapper(matrix, cluster_list, hchanged_diag, sub_matrix_size, sub_matrix_offset, cluster_num_, check);
-
-				checkCudaErrors(cudaMemcpy(&hcheck, check, sizeof(bool), cudaMemcpyDeviceToHost));
-			}
-
-			sub_matrix_size *= 2;
-			sub_matrix_offset *= 2;
-			inner_itr_num++;
-		}
-
-		/* If some changes in the cluster list are recorded (some clusters are merged together),
-		 * rebuild the matrix, the cluster location, and apply those changes to the cluster_name array
-		 */
-
-		if (hcheck) {
-			// Apply changes to the cluster_name array
-			applyClusterChangedWrapper(cluster_name_, cluster_list, cluster_location, point_num_);
-
-			checkCudaErrors(cudaMemset(cluster_location, 0, sizeof(int) * (point_num_ + 1)));
-
-			// Remake the cluster location
-			clusterMarkWrapper(cluster_list, cluster_location, cluster_num_);
-
-			int old_cluster_num = cluster_num_;
-
-			GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
-
-			checkCudaErrors(cudaMalloc(&new_cluster_list, sizeof(int) * cluster_num_));
-
-			clusterCollectorWrapper(new_cluster_list, cluster_num_);
-
-			// Rebuild matrix
-			int *new_matrix;
-
-			std::cout << "cluster_num = " << cluster_num_ << std::endl;
-			checkCudaErrors(cudaMalloc(&new_matrix, sizeof(int) * cluster_num_ * cluster_num_));
-			checkCudaErrors(cudaMemset(new_matrix, 0, sizeof(int) * cluster_num_ * cluster_num_));
-
-			rebuildMatrixWrapper(matrix, cluster_list, new_matrix, cluster_location, old_cluster_num, cluster_num_);
-
-			checkCudaErrors(cudaFree(cluster_list));
-			cluster_list = new_cluster_list;
-
-			checkCudaErrors(cudaFree(matrix));
-			matrix = new_matrix;
-		}
-
-		itr++;
-	} while (hcheck);
-
-
-	gettimeofday(&end, NULL);
-
-	std::cout << "Iteration = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
-
-//	renamingClusters(cluster_name_, cluster_location, point_num_);
-	applyClusterChangedWrapper(cluster_name_, cluster_list, cluster_location, point_num_);
-
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, point_num_ * sizeof(int), cudaMemcpyDeviceToHost));
-
-	checkCudaErrors(cudaFree(matrix));
-	checkCudaErrors(cudaFree(cluster_list));
-	checkCudaErrors(cudaFree(cluster_location));
-	checkCudaErrors(cudaFree(check));
-	checkCudaErrors(cudaFree(changed_diag));
-
-	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl;
+	extractClusters(total_time, initial_time, build_matrix, clustering_time, iteration_num);
 }

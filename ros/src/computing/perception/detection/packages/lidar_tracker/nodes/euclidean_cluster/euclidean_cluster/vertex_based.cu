@@ -264,141 +264,17 @@ __global__ void clusterMark2(int *cluster_list, int *cluster_location, int clust
 
 void GpuEuclideanCluster2::extractClusters2()
 {
-	initClusters();
+	long long total_time, build_graph, clustering_time;
+	int iteration_num;
 
-	int block_x = (point_num_ < block_size_x_) ? point_num_ : block_size_x_;
-	int grid_x = (point_num_ - 1) / block_x + 1;
-
-	long long int *adjacent_count;
-	int *adjacent_list;
-
-	checkCudaErrors(cudaMalloc(&adjacent_count, sizeof(long long int) * (point_num_ + 1)));
-
-#ifdef TEST_VERTEX_
-	struct timeval start, end;
-
-	gettimeofday(&start, NULL);
-#endif
-
-	countAdjacentList<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, threshold_, adjacent_count);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());
-
-
-#ifdef TEST_VERTEX_
-	gettimeofday(&end, NULL);
-
-	std::cout << "Count ADJ = " << timeDiff(start, end) << std::endl;
-#endif
-
-	long long int adjacent_list_size;
-
-	GUtilities::exclusiveScan(adjacent_count, point_num_ + 1, &adjacent_list_size);
-
-
-	if (adjacent_list_size == 0) {
-		checkCudaErrors(cudaFree(adjacent_count));
-		cluster_num_ = 0;
-		return;
-	}
-
-	std::cout << "Adjacent list size = " << adjacent_list_size << std::endl;
-	checkCudaErrors(cudaMalloc(&adjacent_list, sizeof(int) * adjacent_list_size));
-
-
-#ifdef TEST_VERTEX_
-	gettimeofday(&start, NULL);
-#endif
-
-	buildAdjacentList<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, threshold_, adjacent_count, adjacent_list);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());
-
-#ifdef TEST_VERTEX_
-	gettimeofday(&end, NULL);
-
-	std::cout << "Build ADJ = " << timeDiff(start, end) << std::endl;
-#endif
-
-	bool *changed;
-
-	bool hchanged;
-	checkCudaErrors(cudaMalloc(&changed, sizeof(bool)));
-
-	int *frontier_array1, *frontier_array2;
-
-	checkCudaErrors(cudaMalloc(&frontier_array1, sizeof(int) * point_num_));
-	checkCudaErrors(cudaMalloc(&frontier_array2, sizeof(int) * point_num_));
-
-	frontierInitialize<<<grid_x, block_x>>>(frontier_array1, point_num_);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaMemset(frontier_array2, 0, sizeof(int) * point_num_));
-	checkCudaErrors(cudaDeviceSynchronize());
-
-#ifdef TEST_VERTEX_
-	gettimeofday(&start, NULL);
-#endif
-
-	int itr = 0;
-
-	do {
-		hchanged = false;
-		checkCudaErrors(cudaMemcpy(changed, &hchanged, sizeof(bool), cudaMemcpyHostToDevice));
-
-		clustering<<<grid_x, block_x>>>(adjacent_count, adjacent_list, point_num_, cluster_name_, frontier_array1, frontier_array2, changed);
-		checkCudaErrors(cudaGetLastError());
-		checkCudaErrors(cudaDeviceSynchronize());
-
-		int *tmp;
-
-		tmp = frontier_array1;
-		frontier_array1 = frontier_array2;
-		frontier_array2 = tmp;
-
-		checkCudaErrors(cudaMemcpy(&hchanged, changed, sizeof(bool), cudaMemcpyDeviceToHost));
-
-		itr++;
-	} while (hchanged);
-
-
-
-#ifdef TEST_VERTEX_
-	gettimeofday(&end, NULL);
-
-	std::cout << "Iteration = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
-#endif
-
-
-	// renaming clusters
-	int *cluster_location;
-
-	checkCudaErrors(cudaMalloc(&cluster_location, sizeof(int) * (point_num_ + 1)));
-	checkCudaErrors(cudaMemset(cluster_location, 0, sizeof(int) * (point_num_ + 1)));
-
-	clusterMark2<<<grid_x, block_x>>>(cluster_name_, cluster_location, point_num_);
-	checkCudaErrors(cudaGetLastError());
-	checkCudaErrors(cudaDeviceSynchronize());
-
-	GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
-
-	renamingClusters(cluster_name_, cluster_location, point_num_);
-
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
-
-	checkCudaErrors(cudaFree(adjacent_count));
-	checkCudaErrors(cudaFree(adjacent_list));
-	checkCudaErrors(cudaFree(frontier_array1));
-	checkCudaErrors(cudaFree(frontier_array2));
-	checkCudaErrors(cudaFree(changed));
-	checkCudaErrors(cudaFree(cluster_location));
-
-	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl;
+	extractClusters2(total_time, build_graph, clustering_time, iteration_num);
 }
 
 
 
 void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &build_graph, long long &clustering_time, int &iteration_num)
 {
+	std::cout << "VERTEX-BASED 1: compare pairwise distance of all points" << std::endl;
 	total_time = build_graph = clustering_time = 0;
 	iteration_num = 0;
 
@@ -548,5 +424,5 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 
 	total_time += timeDiff(start, end);
 
-	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl;
+	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
 }

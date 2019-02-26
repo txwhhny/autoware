@@ -229,13 +229,16 @@ if (${CUDA_FOUND})
     cuda_add_library(gpu_euclidean_clustering
 #            nodes/euclidean_cluster/includes/gpu_euclidean_clustering.h
 #            nodes/euclidean_cluster/gpu_euclidean_clustering.cu
+				nodes/euclidean_cluster/euclidean_cluster/utilities.cu
 				nodes/euclidean_cluster/euclidean_cluster/include/euclidean_cluster.h
 				nodes/euclidean_cluster/euclidean_cluster/common.cu
 				nodes/euclidean_cluster/euclidean_cluster/edge_based.cu
 				nodes/euclidean_cluster/euclidean_cluster/edge_based2.cu
 				nodes/euclidean_cluster/euclidean_cluster/vertex_based.cu
+				nodes/euclidean_cluster/euclidean_cluster/vertex_based2.cu
 				nodes/euclidean_cluster/euclidean_cluster/matrix_based.cu
-				nodes/euclidean_cluster/euclidean_cluster/sparse_matrix_based.cu
+				nodes/euclidean_cluster/euclidean_cluster/matrix_based2.cu
+				nodes/euclidean_cluster/euclidean_cluster/voxel_grid.cu
             )
 
     target_link_libraries(euclidean_cluster

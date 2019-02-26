@@ -6,8 +6,7 @@
 #include <vector>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include <time.h>
-#include <sys/time.h>
+
 
 class GpuEuclideanCluster2 {
 public:
@@ -36,13 +35,17 @@ public:
 	void extractClusters3();
 	void extractClusters3(long long &total_time, long long &graph_build_time, long long &clustering_time, int &iteration_num);
 
-	// List of sub-matrix: Similar to matrix-based, but use a list of sub-matrix to reduce
-	// the amount of memory needed
+	// Matrix-based: Use octree to fasten matrix build
 	void extractClusters4();
+	void extractClusters4(long long &total_time, long long &initial_time, long long &build_matrix, long long &clustering_time, int &iteration_num);
 
-	// Edge-based: Sample graph, use edge set and atomic operations
+	// Edge-based: Full graph, use octree
 	void extractClusters5();
 	void extractClusters5(long long &total_time, long long &graph_build_time, long long &clustering_time, int &iteration_num);
+
+	// Vertex-based: Full graph, use octree
+	void extractClusters6();
+	void extractClusters6(long long &total_time, long long &graph_build_time, long long &clustering_time, int &iteration_num);
 
 	std::vector<GClusterIndex> getOutput();
 
@@ -66,6 +69,8 @@ private:
 	void clusterCollectorWrapper(int *new_cluster_list, int new_cluster_num);
 
 	void buildClusterMatrixWrapper(float *x, float *y, float *z, int *cluster_name, int *cluster_location, int *matrix, int point_num, int cluster_num, float threshold);
+
+	void buildClusterMatrixWrapper(int *starting_neighbor_ids, int *neighbor_ids, int *cluster_name, int *cluster_location, int *matrix, int point_num, int cluster_num);
 
 	void mergeLocalClustersWrapper(int *cluster_list, int *matrix, int cluster_num, bool *changed);
 
@@ -101,21 +106,6 @@ private:
 
 #ifndef GRID_SIZE_Y
 #define GRID_SIZE_Y (1024)
-#endif
-
-inline void gassert(cudaError_t err_code, const char *file, int line)
-{
-	if (err_code != cudaSuccess) {
-		fprintf(stderr, "Error: %s %s %d\n", cudaGetErrorString(err_code), file, line);
-		cudaDeviceReset();
-		exit(EXIT_FAILURE);
-	}
-}
-
-#define checkCudaErrors(err_code) gassert(err_code, __FILE__, __LINE__)
-
-#ifndef timeDiff
-#define timeDiff(start, end) ((end.tv_sec - start.tv_sec) * 1000000 + (end.tv_usec - start.tv_usec))
 #endif
 
 #endif
