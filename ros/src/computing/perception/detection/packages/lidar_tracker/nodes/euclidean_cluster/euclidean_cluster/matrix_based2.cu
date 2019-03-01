@@ -27,7 +27,9 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 	initial_time = timeDiff(start, end);
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "blockClustering = " << timeDiff(start, end) << std::endl;
+#endif
 
 	// Collect the remaining clusters
 	// Locations of clusters in the cluster list
@@ -53,11 +55,15 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "Collect remaining clusters: " << timeDiff(start, end) << std::endl;
+#endif
 
 	cluster_num_ = new_cluster_num;
 
+#ifdef DEBUG_
 	std::cout << "Number of remaining cluste: " << cluster_num_ << std::endl;
+#endif
 
 	gettimeofday(&start, NULL);
 	// Build relation matrix which describe the current relationship between clusters
@@ -73,13 +79,17 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 	build_matrix = timeDiff(start, end);
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "Build RC and Matrix = " << timeDiff(start, end) << std::endl;
+#endif
 
 	if (is_zero) {
 		checkCudaErrors(cudaFree(matrix));
 		checkCudaErrors(cudaFree(cluster_location));
 		checkCudaErrors(cudaFree(cluster_list));
 		checkCudaErrors(cudaFree(check));
+
+		std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
 
 		return;
 	}
@@ -110,11 +120,15 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 
 		while (!(hcheck) && sub_matrix_size * block_size_x_ < cluster_num_ && cluster_num_ > block_size_x_) {
 
+#ifdef DEBUG_
 			std::cout << "Check intersection " << std::endl;
+#endif
 			clusterIntersecCheckWrapper(matrix, changed_diag, &hchanged_diag, sub_matrix_size, sub_matrix_offset, cluster_num_);
 
 			if (hchanged_diag >= 0) {
+#ifdef DEBUG_
 				std::cout << "Merge foreign clusters" << std::endl;
+#endif
 				mergeForeignClustersWrapper(matrix, cluster_list, hchanged_diag, sub_matrix_size, sub_matrix_offset, cluster_num_, check);
 
 				checkCudaErrors(cudaMemcpy(&hcheck, check, sizeof(bool), cudaMemcpyDeviceToHost));
@@ -173,7 +187,9 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 	clustering_time = timeDiff(start, end);
 	total_time += timeDiff(start, end);
 	iteration_num = itr;
+#ifdef DEBUG_
 	std::cout << "Iteration = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
+#endif
 
 	gettimeofday(&start, NULL);
 //	renamingClusters(cluster_name_, cluster_location, point_num_);

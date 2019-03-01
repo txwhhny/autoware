@@ -13,7 +13,7 @@ __global__ void frontierInitialize(int *frontier_array, int point_num)
 	}
 }
 
-__global__ void countAdjacentList(float *x, float *y, float *z, int point_num, float threshold, long long int *adjacent_count)
+__global__ void countAdjacentList(float *x, float *y, float *z, int point_num, float threshold, long long *adjacent_count)
 {
 	float *local_x = local_buff;
 	float *local_y = local_x + blockDim.x;
@@ -112,7 +112,7 @@ __global__ void countAdjacentList(float *x, float *y, float *z, int point_num, f
 	}
 }
 
-__global__ void buildAdjacentList(float *x, float *y, float *z, int point_num, float threshold, long long int *adjacent_count, int *adjacent_list)
+__global__ void buildAdjacentList(float *x, float *y, float *z, int point_num, float threshold, long long *adjacent_count, int *adjacent_list)
 {
 	float *local_x = local_buff;
 	float *local_y = local_x + blockDim.x;
@@ -121,7 +121,7 @@ __global__ void buildAdjacentList(float *x, float *y, float *z, int point_num, f
 	int last_point = (point_num / blockDim.x) * blockDim.x;
 
 	for (pid = threadIdx.x + blockIdx.x * blockDim.x; pid < last_point; pid += blockDim.x * gridDim.x) {
-		long long int writing_location = adjacent_count[pid];
+		long long writing_location = adjacent_count[pid];
 		float tmp_x = x[pid];
 		float tmp_y = y[pid];
 		float tmp_z = z[pid];
@@ -205,7 +205,7 @@ __global__ void buildAdjacentList(float *x, float *y, float *z, int point_num, f
 	}
 }
 
-__global__ void clustering(long long int *adjacent_list_loc, int *adjacent_list, int point_num, int *cluster_name, int *frontier_array1, int *frontier_array2, bool *changed)
+__global__ void clustering(long long *adjacent_list_loc, int *adjacent_list, int point_num, int *cluster_name, int *frontier_array1, int *frontier_array2, bool *changed)
 {
 	__shared__ bool schanged;
 
@@ -218,11 +218,11 @@ __global__ void clustering(long long int *adjacent_list_loc, int *adjacent_list,
 			frontier_array1[pid] = 0;
 			int cname = cluster_name[pid];
 			bool c = false;
-			long long int start = adjacent_list_loc[pid];
-			long long int end = adjacent_list_loc[pid + 1];
+			long long start = adjacent_list_loc[pid];
+			long long end = adjacent_list_loc[pid + 1];
 
 			// Iterate through neighbors' ids
-			for (long long int i = start; i < end; i++) {
+			for (long long i = start; i < end; i++) {
 				int nid = adjacent_list[i];
 				int nname = cluster_name[nid];
 				if (cname < nname) {
@@ -274,7 +274,10 @@ void GpuEuclideanCluster2::extractClusters2()
 
 void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &build_graph, long long &clustering_time, int &iteration_num)
 {
+#ifdef DEBUG_
 	std::cout << "VERTEX-BASED 1: compare pairwise distance of all points" << std::endl;
+#endif
+
 	total_time = build_graph = clustering_time = 0;
 	iteration_num = 0;
 
@@ -283,42 +286,39 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 	int block_x = (point_num_ < block_size_x_) ? point_num_ : block_size_x_;
 	int grid_x = (point_num_ - 1) / block_x + 1;
 
-	long long int *adjacent_count;
+	long long *adjacent_count;
 	int *adjacent_list;
 
-#ifdef TEST_VERTEX_
 	struct timeval start, end;
 
 	gettimeofday(&start, NULL);
-#endif
 
-	checkCudaErrors(cudaMalloc(&adjacent_count, sizeof(long long int) * (point_num_ + 1)));
+	checkCudaErrors(cudaMalloc(&adjacent_count, sizeof(long long) * (point_num_ + 1)));
 
 	countAdjacentList<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, threshold_, adjacent_count);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-
-#ifdef TEST_VERTEX_
 	gettimeofday(&end, NULL);
 
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
+
+#ifdef DEBUG_
 	std::cout << "Count ADJ = " << timeDiff(start, end) << std::endl;
 #endif
 
-	long long int adjacent_list_size;
+	long long adjacent_list_size;
 
-#ifdef TEST_VERTEX_
 	gettimeofday(&start, NULL);
-#endif
+
+
 	GUtilities::exclusiveScan(adjacent_count, point_num_ + 1, &adjacent_list_size);
-#ifdef TEST_VERTEX_
+
 	gettimeofday(&end, NULL);
 
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
-#endif
 
 	if (adjacent_list_size == 0) {
 		checkCudaErrors(cudaFree(adjacent_count));
@@ -326,10 +326,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 		return;
 	}
 
-
-#ifdef TEST_VERTEX_
 	gettimeofday(&start, NULL);
-#endif
 
 	checkCudaErrors(cudaMalloc(&adjacent_list, sizeof(int) * adjacent_list_size));
 
@@ -337,11 +334,12 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-#ifdef TEST_VERTEX_
 	gettimeofday(&end, NULL);
 
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
+
+#ifdef DEBUG_
 	std::cout << "Build ADJ = " << timeDiff(start, end) << std::endl;
 #endif
 
@@ -386,16 +384,16 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 	} while (hchanged);
 
 
-
-#ifdef TEST_VERTEX_
 	gettimeofday(&end, NULL);
 
 	clustering_time += timeDiff(start, end);
 	total_time += timeDiff(start, end);
+
+#ifdef DEBUG_
 	std::cout << "Iteration = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
-	iteration_num = itr;
 #endif
 
+	iteration_num = itr;
 
 	// renaming clusters
 	int *cluster_location;
@@ -424,5 +422,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
+#endif
 }

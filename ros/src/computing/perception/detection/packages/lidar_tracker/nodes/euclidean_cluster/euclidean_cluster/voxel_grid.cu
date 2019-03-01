@@ -639,8 +639,14 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 		return;
 	}
 
+	struct timeval start, end;
+
+	gettimeofday(&start, NULL);
 	checkCudaErrors(cudaMalloc(matrix, sizeof(int) * label_num * label_num));
 	checkCudaErrors(cudaMemset(*matrix, 0, sizeof(int) * label_num * label_num));
+	gettimeofday(&end, NULL);
+
+	std::cout << "Matrix memset = " << timeDiff(start, end) << std::endl;
 
 	// neighbor search and set to matrix
 	int block_x, grid_x;
@@ -652,13 +658,19 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
 	grid_x = (point_num_ * 27 - 1) / block_x + 1;
 
+	gettimeofday(&start, NULL);
 	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+	gettimeofday(&end, NULL);
+
+	std::cout << "initCandidateVids = " << timeDiff(start, end) << std::endl;
+
 
 	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
+	gettimeofday(&start, NULL);
 	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
 											vgrid_x_, vgrid_y_, vgrid_z_,
 											voxel_x_, voxel_y_, voxel_z_,
@@ -668,6 +680,9 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 											candidate_vids);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+	gettimeofday(&end, NULL);
+
+	std::cout << "boundariesSearch = " << timeDiff(start, end) << std::endl;
 
 	bool *g_is_zero;
 
@@ -677,12 +692,16 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 
 	checkCudaErrors(cudaMemcpy(g_is_zero, is_zero, sizeof(bool), cudaMemcpyHostToDevice));
 
+	gettimeofday(&start, NULL);
 	matrixBuild<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
 										candidate_vids,
 										starting_point_ids_, point_ids_,
 										point_labels, label_num, *matrix, g_is_zero, radius);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+	gettimeofday(&end, NULL);
+
+	std::cout << "matrixBuild = " << timeDiff(start, end) << std::endl;
 
 	checkCudaErrors(cudaMemcpy(is_zero, g_is_zero, sizeof(bool), cudaMemcpyDeviceToHost));
 

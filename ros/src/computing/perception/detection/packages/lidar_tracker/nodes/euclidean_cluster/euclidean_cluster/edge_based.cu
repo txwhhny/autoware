@@ -6,7 +6,7 @@
 extern __shared__ float local_buff[];
 
 // Build edge set
-__global__ void edgeCount(float *x, float *y, float *z, int point_num, long long int *edge_count, float threshold)
+__global__ void edgeCount(float *x, float *y, float *z, int point_num, long long *edge_count, float threshold)
 {
 	float *local_x = local_buff;
 	float *local_y = local_x + blockDim.x;
@@ -19,7 +19,7 @@ __global__ void edgeCount(float *x, float *y, float *z, int point_num, long long
 		float tmp_x = x[pid];
 		float tmp_y = y[pid];
 		float tmp_z = z[pid];
-		long long int count = 0;
+		long long count = 0;
 
 		int block_id;
 
@@ -94,7 +94,7 @@ __global__ void edgeCount(float *x, float *y, float *z, int point_num, long long
 }
 
 
-__global__ void buildEdgeSet(float *x, float *y, float *z, int point_num, long long int *edge_count, int2 *edge_set, float threshold, long long int edge_num)
+__global__ void buildEdgeSet(float *x, float *y, float *z, int point_num, long long *edge_count, int2 *edge_set, float threshold, long long edge_num)
 {
 	float *local_x = local_buff;
 	float *local_y = local_x + blockDim.x;
@@ -104,7 +104,7 @@ __global__ void buildEdgeSet(float *x, float *y, float *z, int point_num, long l
 	int2 new_edge;
 
 	for (pid = threadIdx.x + blockIdx.x * blockDim.x; pid < last_point; pid += blockDim.x * gridDim.x) {
-		long long int writing_location = edge_count[pid];
+		long long writing_location = edge_count[pid];
 		float tmp_x = x[pid];
 		float tmp_y = y[pid];
 		float tmp_z = z[pid];
@@ -235,7 +235,9 @@ void GpuEuclideanCluster2::extractClusters3()
 
 void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &build_graph, long long &clustering_time, int &iteration_num)
 {
+#ifdef DEBUG_
 	std::cout << "EDGE-BASED 1: compare every pairwise distance" << std::endl;
+#endif
 
 	total_time = build_graph = clustering_time = 0;
 	iteration_num = 0;
@@ -250,29 +252,29 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 	grid_x = (point_num_ - 1) / block_x + 1;
 
 
-	long long int *edge_count;
+	long long *edge_count;
 
 	gettimeofday(&start, NULL);
-	checkCudaErrors(cudaMalloc(&edge_count, sizeof(long long int) * (point_num_ + 1)));
-	checkCudaErrors(cudaMemset(edge_count, 0x00, sizeof(long long int) * (point_num_ + 1)));
+	checkCudaErrors(cudaMalloc(&edge_count, sizeof(long long) * (point_num_ + 1)));
+	checkCudaErrors(cudaMemset(edge_count, 0x00, sizeof(long long) * (point_num_ + 1)));
 
 
-	edgeCount<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3 + sizeof(long long int) * block_size_x_>>>(x_, y_, z_, point_num_, edge_count, threshold_);
+	edgeCount<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3 + sizeof(long long) * block_size_x_>>>(x_, y_, z_, point_num_, edge_count, threshold_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	long long int edge_num;
+	long long edge_num;
 
 	gettimeofday(&end, NULL);
 
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
+
+#ifdef DEBUG_
 	std::cout << "Count Edge Set = " << timeDiff(start, end) << std::endl;
+#endif
 
 	GUtilities::exclusiveScan(edge_count, point_num_ + 1, &edge_num);
-
-	//std::cout << "Edge num = " << edge_num << std::endl;
-
 
 	if (edge_num == 0) {
 		checkCudaErrors(cudaFree(edge_count));
@@ -305,8 +307,9 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "Build Edge Set = " << timeDiff(start, end) << std::endl;
-
+#endif
 
 	gettimeofday(&start, NULL);
 	do {
@@ -327,7 +330,10 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 	clustering_time += timeDiff(start, end);
 	total_time += timeDiff(start, end);
 	iteration_num = itr;
+
+#ifdef DEBUG_
 	std::cout << "Iteration time = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
+#endif
 
 	int *count;
 
@@ -357,7 +363,7 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 
 	total_time += timeDiff(start, end);
 
-	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl;
-
-	std::cout << "EDGE_NUM = " << edge_num << std::endl;
+#ifdef DEBUG_
+	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
+#endif
 }
