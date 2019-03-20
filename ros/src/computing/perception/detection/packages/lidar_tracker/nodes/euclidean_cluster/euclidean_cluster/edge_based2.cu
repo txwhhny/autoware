@@ -3,6 +3,11 @@
 #include <cuda.h>
 #include "include/voxel_grid.h"
 
+#ifdef DEBUG_
+#include <fstream>
+#include <string>
+#endif
+
 __global__ void markValidPoints0(int *starting_neighbor_ids, int point_num, int *mark)
 {
 	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num - 1; i += blockDim.x * gridDim.x) {
@@ -92,7 +97,9 @@ void GpuEuclideanCluster2::extractClusters5()
 
 void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &build_graph, long long &clustering_time, int &iteration_num)
 {
+#ifdef DEBUG_
 	std::cout << "EDGE-BASED 2 METHOD point_num = " << point_num_ << std::endl;
+#endif
 
 	initClusters();
 
@@ -105,8 +112,19 @@ void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &bu
 
 	GVoxelGrid new_grid(x_, y_, z_, point_num_, threshold_, threshold_, threshold_);
 
+	gettimeofday(&end, NULL);
+
+#ifdef DEBUG_
+	std::cout << "Create new voxel = " << timeDiff(start, end) << std::endl;
+#endif
+
+	build_graph += timeDiff(start, end);
+	total_time += timeDiff(start, end);
+
 	int2 *edge_set;
 	int edge_num;
+
+	gettimeofday(&start, NULL);
 
 	new_grid.createEdgeSet(&edge_set, &edge_num, threshold_);
 
@@ -118,10 +136,16 @@ void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &bu
 
 	gettimeofday(&end, NULL);
 
+#ifdef DEBUG_
+	std::cout << "Create adjacency list = " << timeDiff(start, end) << std::endl;
+#endif
+
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "Build Edge Set = " << timeDiff(start, end) << std::endl;
+#endif
 
 	gettimeofday(&start, NULL);
 
@@ -135,6 +159,7 @@ void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &bu
 
 	int itr = 0;
 
+
 	do {
 		hchanged = false;
 
@@ -146,6 +171,7 @@ void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &bu
 
 		checkCudaErrors(cudaMemcpy(&hchanged, changed, sizeof(bool), cudaMemcpyDeviceToHost));
 		itr++;
+
 	} while (hchanged);
 
 	gettimeofday(&end, NULL);
@@ -153,7 +179,10 @@ void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &bu
 	clustering_time += timeDiff(start, end);
 	total_time += timeDiff(start, end);
 	iteration_num = itr;
+
+#ifdef DEBUG_
 	std::cout << "Iteration time = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
+#endif
 
 	int *count;
 
@@ -173,8 +202,6 @@ void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &bu
 
 	renamingClusters(cluster_name_, count, point_num_);
 
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
-
 	checkCudaErrors(cudaFree(edge_set));
 	checkCudaErrors(cudaFree(changed));
 	checkCudaErrors(cudaFree(count));
@@ -182,6 +209,8 @@ void GpuEuclideanCluster2::extractClusters5(long long &total_time, long long &bu
 
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
+#endif
 
 }

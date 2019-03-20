@@ -82,24 +82,39 @@ void GpuEuclideanCluster2::extractClusters6()
 
 void GpuEuclideanCluster2::extractClusters6(long long &total_time, long long &build_graph, long long &clustering_time, int &iteration_num)
 {
+#ifdef DEBUG_
 	std::cout << "VERTEX-BASED 2: Use octree" << std::endl;
+#endif
 	total_time = build_graph = clustering_time = 0;
 	iteration_num = 0;
 
-#ifdef TEST_VERTEX_
 	struct timeval start, end;
 
 	gettimeofday(&start, NULL);
-#endif
+
 
 	initClusters();
 
+	gettimeofday(&end, NULL);
+
+	total_time += timeDiff(start, end);
+
+	gettimeofday(&start, NULL);
 	GVoxelGrid new_grid(x_, y_, z_, point_num_, threshold_, threshold_, threshold_);
+	gettimeofday(&end, NULL);
+
+#ifdef DEBUG_
+	std::cout << "Create voxel = " << timeDiff(start, end) << std::endl;
+#endif
+
+	build_graph += timeDiff(start, end);
+	total_time += timeDiff(start, end);
 
 	int *adjacent_count = NULL;
 	int *adjacent_list = NULL;
 	int adjacent_list_size = 0;
 
+	gettimeofday(&start, NULL);
 	new_grid.createAdjacentList(&adjacent_count, &adjacent_list, &adjacent_list_size, threshold_);
 
 	if (adjacent_list_size == 0) {
@@ -111,11 +126,16 @@ void GpuEuclideanCluster2::extractClusters6(long long &total_time, long long &bu
 	int block_x = (point_num_ < block_size_x_) ? point_num_ : block_size_x_;
 	int grid_x = (point_num_ - 1) / block_x + 1;
 
-#ifdef TEST_VERTEX_
 	gettimeofday(&end, NULL);
+
+#ifdef DEBUG_
+	std::cout << "Create adjacency list = " << timeDiff(start, end) << std::endl;
+#endif
 
 	build_graph += timeDiff(start, end);
 	total_time += timeDiff(start, end);
+
+#ifdef DEBUG_
 	std::cout << "Build graph = " << timeDiff(start, end) << std::endl;
 #endif
 
@@ -126,9 +146,7 @@ void GpuEuclideanCluster2::extractClusters6(long long &total_time, long long &bu
 
 	int *frontier_array1, *frontier_array2;
 
-#ifdef TEST_VERTEX_
 	gettimeofday(&start, NULL);
-#endif
 
 	checkCudaErrors(cudaMalloc(&frontier_array1, sizeof(int) * point_num_));
 	checkCudaErrors(cudaMalloc(&frontier_array2, sizeof(int) * point_num_));
@@ -161,14 +179,16 @@ void GpuEuclideanCluster2::extractClusters6(long long &total_time, long long &bu
 
 
 
-#ifdef TEST_VERTEX_
 	gettimeofday(&end, NULL);
 
 	clustering_time += timeDiff(start, end);
 	total_time += timeDiff(start, end);
+
+#ifdef DEBUG_
 	std::cout << "Iteration = " << timeDiff(start, end) << " itr_num = " << itr << std::endl;
-	iteration_num = itr;
 #endif
+
+	iteration_num = itr;
 
 
 	// renaming clusters
@@ -186,8 +206,6 @@ void GpuEuclideanCluster2::extractClusters6(long long &total_time, long long &bu
 
 	renamingClusters(cluster_name_, cluster_location, point_num_);
 
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
-
 	checkCudaErrors(cudaFree(adjacent_count));
 	checkCudaErrors(cudaFree(adjacent_list));
 	checkCudaErrors(cudaFree(frontier_array1));
@@ -198,5 +216,7 @@ void GpuEuclideanCluster2::extractClusters6(long long &total_time, long long &bu
 
 	total_time += timeDiff(start, end);
 
+#ifdef DEBUG_
 	std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
+#endif
 }

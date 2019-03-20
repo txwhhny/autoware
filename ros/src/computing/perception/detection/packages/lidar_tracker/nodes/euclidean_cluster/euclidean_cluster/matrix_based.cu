@@ -621,6 +621,7 @@ void GpuEuclideanCluster2::extractClusters(long long &total_time, long long &ini
 {
 	std::cout << "MATRIX-BASED 1" << std::endl;
 	total_time = initial_time = build_matrix = clustering_time = 0;
+	iteration_num = 0;
 
 	struct timeval start, end;
 
@@ -794,8 +795,6 @@ void GpuEuclideanCluster2::extractClusters(long long &total_time, long long &ini
 	gettimeofday(&start, NULL);
 //	renamingClusters(cluster_name_, cluster_location, point_num_);
 	applyClusterChangedWrapper(cluster_name_, cluster_list, cluster_location, point_num_);
-
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, point_num_ * sizeof(int), cudaMemcpyDeviceToHost));
 
 	checkCudaErrors(cudaFree(matrix));
 	checkCudaErrors(cudaFree(cluster_list));

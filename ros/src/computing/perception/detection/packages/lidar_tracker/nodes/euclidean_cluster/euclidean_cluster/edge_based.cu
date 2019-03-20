@@ -353,8 +353,6 @@ void GpuEuclideanCluster2::extractClusters3(long long &total_time, long long &bu
 
 	renamingClusters(cluster_name_, count, point_num_);
 
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
-
 	checkCudaErrors(cudaFree(edge_count));
 	checkCudaErrors(cudaFree(edge_set));
 	checkCudaErrors(cudaFree(changed));

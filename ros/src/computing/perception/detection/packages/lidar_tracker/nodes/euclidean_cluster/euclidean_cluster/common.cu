@@ -116,6 +116,8 @@ void GpuEuclideanCluster2::initClusters()
 
 std::vector<GpuEuclideanCluster2::GClusterIndex> GpuEuclideanCluster2::getOutput()
 {
+	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
+
 	std::vector<GpuEuclideanCluster2::GClusterIndex> output(cluster_num_);
 
 	if (cluster_num_ == 0)
@@ -130,7 +132,6 @@ std::vector<GpuEuclideanCluster2::GClusterIndex> GpuEuclideanCluster2::getOutput
 
 		cluster.points_in_cluster.push_back(i);
 	}
-
 
 	int point_num_test = 0;
 

@@ -108,6 +108,6 @@ private:
 #define GRID_SIZE_Y (1024)
 #endif
 
-#define DEBUG_ 1
+//#define DEBUG_ 1
 
 #endif

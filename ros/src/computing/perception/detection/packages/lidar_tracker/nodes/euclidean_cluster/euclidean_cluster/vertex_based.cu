@@ -328,6 +328,7 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 
 	gettimeofday(&start, NULL);
 
+	std::cout << "Adjacent list size = " << adjacent_list_size << std::endl;
 	checkCudaErrors(cudaMalloc(&adjacent_list, sizeof(int) * adjacent_list_size));
 
 	buildAdjacentList<<<grid_x, block_x, sizeof(float) * block_size_x_ * 3>>>(x_, y_, z_, point_num_, threshold_, adjacent_count, adjacent_list);
@@ -409,8 +410,6 @@ void GpuEuclideanCluster2::extractClusters2(long long &total_time, long long &bu
 	GUtilities::exclusiveScan(cluster_location, point_num_ + 1, &cluster_num_);
 
 	renamingClusters(cluster_name_, cluster_location, point_num_);
-
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, sizeof(int) * point_num_, cudaMemcpyDeviceToHost));
 
 	checkCudaErrors(cudaFree(adjacent_count));
 	checkCudaErrors(cudaFree(adjacent_list));

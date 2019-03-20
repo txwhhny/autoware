@@ -69,102 +69,249 @@ void GPUECTest::pointCloudVariationTest()
 {
 	std::ofstream test_result("/home/anh/euclidean_cluster_test.ods");
 
-	int point_num, disjoint_comp_num, joint_comp_num, point_distance;
+	int point_num, disjoint_comp_num, joint_comp_num, point_distance, point_degree;
 
 
 	// Initialize gpu, produce no output file
 	matrixTest();
 
-	std::cout << "***** Unequal cluster test *****" << std::endl;
-	point_num = 262144;
-	disjoint_comp_num = 128;
-	int point_num_per_joint = 16;
+//	std::cout << "***** Unequal cluster test *****" << std::endl;
+//	point_num = 262144;
+//	disjoint_comp_num = 128;
+//	int point_num_per_joint = 16;
+//
+//	test_result << "****** Unequal cluster test *****" << std::endl;
+//	test_result << "point_num = 262144 disjoint num = 1024 point location is randomized average number of point per joint = 16, point_distance = 4" << std::endl;
+//	test_result << "Common difference, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+//	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+//	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+//
+//	for (int common_diff = 0; common_diff < 2 * (point_num - disjoint_comp_num * point_num_per_joint) / (disjoint_comp_num * (disjoint_comp_num - 1)); common_diff++) {
+//		std::cout << "Common diff = " << common_diff << std::endl;
+//		std::string res = variousSizeClusterTest(point_num, disjoint_comp_num, point_num_per_joint, common_diff);
+//
+//		test_result << common_diff << "," << res << std::endl;
+//	}
 
-	test_result << "****** Unequal cluster test *****" << std::endl;
-	test_result << "point_num = 262144 disjoint num = 1024 point location is randomized average number of point per joint = 16, point_distance = 4" << std::endl;
-	test_result << "Common difference, Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2, CPU, ";
-	test_result << "Edge-based,,, Matrix-based,,,, Vertex-based,,, Edge-based 2,,, Matrix-based 2,,,, Vertex-based 2,,, CPU,, ";
-	test_result << "Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2" << std::endl;
-
-	for (int common_diff = 0; common_diff < 2 * (point_num - disjoint_comp_num * point_num_per_joint) / (disjoint_comp_num * (disjoint_comp_num - 1)); common_diff++) {
-		std::cout << "Common diff = " << common_diff << std::endl;
-		std::string res = variousSizeClusterTest(point_num, disjoint_comp_num, point_num_per_joint, common_diff);
-
-		test_result << common_diff << "," << res << std::endl;
-	}
 
 	std::cout << "***** POINT CLOUD VARIATION TEST *****" << std::endl;
 
 	//int point_num, disjoint_comp_num, joint_comp_num, point_distance;
-
-	std::cout << "***** Point Num Variation Test *****" << std::endl;
+	std::cout << "########################### Point Num Variation Test ##################################" << std::endl;
 	// Point num variation, fix disjoint_comp_num, joint_comp_num, point_distance
 	disjoint_comp_num = 128;
-	joint_comp_num = 32;
+	point_degree = 32;
 	point_distance = 4;
 
 	test_result << "****** Point Num Variation Test *****" << std::endl;
-	test_result << "point_num varies disjoint num = 128 joint num = 32 point distance = 4" << std::endl;
-	test_result << "Point num, Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2, CPU, ";
-	test_result << "Edge-based,,, Matrix-based,,,, Vertex-based,,, Edge-based 2,,, Matrix-based 2,,,, Vertex-based 2,,, CPU,, ";
-	test_result << "Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2" << std::endl;
+	test_result << "point_num varies disjoint num = 128 point degree = 32 point distance = 4" << std::endl;
+	test_result << "Point num, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
 
 	for (point_num = 128 * 32; point_num <= 262144; point_num *= 2) {
+		joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
 		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
 		test_result << point_num << "," << res << std::endl;
 	}
 
 	test_result << std::endl << std::endl << std::endl;
 
-	std::cout << "***** Disjoint Comp Num Variation Test *****" << std::endl;
+	std::cout << "########################### Disjoint Comp Num Variation Test ###########################" << std::endl;
 
 	test_result << "***** Disjoint Comp Num Variation Test *****" << std::endl;
-	test_result << "Disjoint num varies point num = 262144 joint num = 32 point distance = 4" << std::endl;
+	test_result << "Cluster num varies point num = 262144 point degree = 32 point distance = 4" << std::endl;
 
-	test_result << "Disjoint num, Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2, CPU, ";
-	test_result << "Edge-based,,, Matrix-based,,,, Vertex-based,,, Edge-based 2,,, Matrix-based 2,,,, Vertex-based 2,,, CPU,, ";
-	test_result << "Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2" << std::endl;
+	test_result << "Cluster num, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
 
 	// Disjoint_comp_num variation, point_num fix, joint_comp_num fix, and point_distance
 	point_num = 262144;
-	joint_comp_num = 32;
+	point_degree = 32;
 	point_distance = 4;
 
 	for (disjoint_comp_num = 16; disjoint_comp_num <= 8192; disjoint_comp_num *= 2) {
+		joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
+		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
+		test_result << disjoint_comp_num << "," << res << std::endl;
+	}
+
+	std::cout << "########################### Disjoint Comp Num Variation Test ###########################" << std::endl;
+
+	test_result << "***** Disjoint Comp Num Variation Test *****" << std::endl;
+	test_result << "Cluster num varies point num = 32768 point degree = 32 point distance = 4" << std::endl;
+
+	test_result << "Cluster num, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+
+	// Disjoint_comp_num variation, point_num fix, joint_comp_num fix, and point_distance
+	point_num = 32768;
+	point_degree = 32;
+	point_distance = 4;
+
+	for (disjoint_comp_num = 16; disjoint_comp_num <= 1024; disjoint_comp_num *= 2) {
+		joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
 		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
 		test_result << disjoint_comp_num << "," << res << std::endl;
 	}
 
 	test_result << std::endl << std::endl << std::endl;
 
-	std::cout << "***** Joint Comp Num Variation Test *****" << std::endl;
-	test_result << "***** Joint Comp Num Variation Test *****" << std::endl;
-	test_result << "Joint num varies point num = 262144 disjoint num = 128 point distance = 4" << std::endl;
+	std::cout << "########################### Disjoint Comp Num Variation Test ###########################" << std::endl;
 
-	test_result << "Joint num, Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2, CPU, ";
-	test_result << "Edge-based,,, Matrix-based,,,, Vertex-based,,, Edge-based 2,,, Matrix-based 2,,,, Vertex-based 2,,, CPU,, ";
-	test_result << "Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2" << std::endl;
+	test_result << "***** Disjoint Comp Num Variation Test *****" << std::endl;
+	test_result << "Cluster num varies point num = 4096 point degree = 32 point distance = 4" << std::endl;
+
+	test_result << "Cluster num, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+
+	// Disjoint_comp_num variation, point_num fix, joint_comp_num fix, and point_distance
+	point_num = 4096;
+	point_degree = 32;
+	point_distance = 4;
+
+	for (disjoint_comp_num = 16; disjoint_comp_num <= 128; disjoint_comp_num *= 2) {
+		joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
+		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
+		test_result << disjoint_comp_num << "," << res << std::endl;
+	}
+
+	test_result << std::endl << std::endl << std::endl;
+
+
+
+	std::cout << "########################### Joint Comp Num Variation Test ###########################" << std::endl;
+	test_result << "***** Point degree Variation Test *****" << std::endl;
+	test_result << "Neighbor num varies point num = 262144 disjoint num = 128 point distance = 4" << std::endl;
+
+	test_result << "Neighbor num, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
 
 	// Joint_comp_num variation, point_num, disjoint_comp_num, and point_distance are fixed
 	point_num = 262144;
 	disjoint_comp_num = 128;
 	point_distance = 4;
 
-	for (joint_comp_num = 1; joint_comp_num <= 2048; joint_comp_num *= 2) {
+	for (point_degree = 1; point_degree <= 2048; point_degree *= 2) {
+		joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
 		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
-		test_result << joint_comp_num << "," << res << std::endl;
+		test_result << point_degree << "," << res << std::endl;
 	}
 	test_result << std::endl << std::endl << std::endl;
 
-	std::cout << "***** Point Distance Variation Test *****" << std::endl;
+
+
+	std::cout << "########################### Joint Comp Num Variation Test ###########################" << std::endl;
+	test_result << "***** Joint Comp Num Variation Test *****" << std::endl;
+	test_result << "Neighbor num varies point num = 32768 disjoint num = 128 point distance = 4" << std::endl;
+
+	test_result << "Neighbor num, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+
+	// Joint_comp_num variation, point_num, disjoint_comp_num, and point_distance are fixed
+	point_num = 32768;
+	disjoint_comp_num = 128;
+	point_distance = 4;
+
+	for (point_degree = 1; point_degree <= 256; point_degree *= 2) {
+		joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
+		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
+		test_result << point_degree << "," << res << std::endl;
+	}
+	test_result << std::endl << std::endl << std::endl;
+
+
+	std::cout << "########################### Joint Comp Num Variation Test ###########################" << std::endl;
+	test_result << "***** Joint Comp Num Variation Test *****" << std::endl;
+	test_result << "Neighbor num varies point num = 4096 disjoint num = 128 point distance = 4" << std::endl;
+
+	test_result << "Neighbor num, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+
+	// Joint_comp_num variation, point_num, disjoint_comp_num, and point_distance are fixed
+	point_num = 4096;
+	disjoint_comp_num = 128;
+	point_distance = 4;
+
+	for (point_degree = 1; point_degree <= 32; point_degree *= 2) {
+		joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
+		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
+		test_result << point_degree << "," << res << std::endl;
+	}
+	test_result << std::endl << std::endl << std::endl;
+
+
+	std::cout << "########################### Point Distance Variation Test ###########################" << std::endl;
+	test_result << "***** Point Distance Variation Test *****" << std::endl;
+	test_result << "Point distance varies point num = 65536 disjoint num = 256 joint_num = 32" << std::endl;
+
+	test_result << "Point distance, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+
+	// Point distance variation, others are fixed
+
+	point_num = 65536;
+	disjoint_comp_num = 256;
+	point_degree = 32;
+
+//	for (point_distance = 1; point_distance <= 2048; point_distance += 7) {
+//		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
+//		test_result << point_distance << "," << res << std::endl;
+//	}
+
+
+	joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
+	SampleCloud base_cloud = pointCloudGeneration(point_num, disjoint_comp_num, joint_comp_num);
+	for (point_distance = 1; point_distance <= 256; point_distance *= 2) {
+		std::string res = pointDistanceTest(base_cloud, point_distance);
+		test_result << point_distance << "," << res << std::endl;
+	}
+
+	test_result << std::endl << std::endl << std::endl;
+
+	// Point distance variation, others are fixed
+	std::cout << "########################### Point Distance Variation Test ###########################" << std::endl;
+	test_result << "***** Point Distance Variation Test *****" << std::endl;
+	test_result << "Point distance varies point num = 65536 disjoint num = 1024 joint_num = 32" << std::endl;
+
+	test_result << "Point distance, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+
+
+	point_num = 65536;
+	disjoint_comp_num = 1024;
+	joint_comp_num = 32;
+
+//	for (point_distance = 1; point_distance <= 2048; point_distance += 7) {
+//		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
+//		test_result << point_distance << "," << res << std::endl;
+//	}
+
+	base_cloud = pointCloudGeneration(point_num, disjoint_comp_num, joint_comp_num);
+	for (point_distance = 1; point_distance <= 1024; point_distance *= 2) {
+		std::string res = pointDistanceTest(base_cloud, point_distance);
+		test_result << point_distance << "," << res << std::endl;
+	}
+
+	test_result << std::endl << std::endl << std::endl;
+
+	// Point distance variation, others are fixed
+	std::cout << "########################### Point Distance Variation Test ###########################" << std::endl;
 	test_result << "***** Point Distance Variation Test *****" << std::endl;
 	test_result << "Point distance varies point num = 65536 disjoint num = 2048 joint_num = 32" << std::endl;
 
-	test_result << "Point distance, Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2, CPU, ";
-	test_result << "Edge-based,,, Matrix-based,,,, Vertex-based,,, Edge-based 2,,, Matrix-based 2,,,, Vertex-based 2,,, CPU,, ";
-	test_result << "Edge-based, Matrix-based, Vertex-based, Edge-based 2, Matrix-based 2, Vertex-based 2" << std::endl;
+	test_result << "Point distance, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
 
-	// Point distance variation, others are fixed
 	point_num = 65536;
 	disjoint_comp_num = 2048;
 	joint_comp_num = 32;
@@ -174,8 +321,8 @@ void GPUECTest::pointCloudVariationTest()
 //		test_result << point_distance << "," << res << std::endl;
 //	}
 
-	SampleCloud base_cloud = pointCloudGeneration(point_num, disjoint_comp_num, joint_comp_num);
-	for (point_distance = 1; point_distance <= 2048; point_distance += 7) {
+	base_cloud = pointCloudGeneration(point_num, disjoint_comp_num, joint_comp_num);
+	for (point_distance = 1; point_distance <= 512; point_distance *= 2) {
 		std::string res = pointDistanceTest(base_cloud, point_distance);
 		test_result << point_distance << "," << res << std::endl;
 	}
@@ -189,7 +336,16 @@ void GPUECTest::pointCloudVariationTest()
 	// Line test
 	point_num = 1048576;
 
-	lineTest(point_num);
+	test_result << "***** LINE TEST *****" << std::endl;
+
+	test_result << "Point distance, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+
+
+	test_result << lineTest(point_num);
+
+	std::cout << "END OF POINT CLOUD VARIATION TEST" << std::endl;
 }
 
 std::string GPUECTest::pointCloudVariationTest(int point_num, int disjoint_comp_num, int joint_comp_num, int point_distance)
@@ -211,19 +367,27 @@ std::string GPUECTest::pointCloudVariationTest(int point_num, int disjoint_comp_
 	pcl::PointXYZ origin(0, 0, 0);
 	float sample_dist;
 
+#ifdef DEBUG_
+	std::ofstream out_test("/home/anh/sample_cloud_pid.txt");
+#endif
+
 	for (int djcomp_id = 0, base_id = 0; djcomp_id < disjoint_comp_num; djcomp_id++, base_id++) {
 		while (status[base_id]) {
 			base_id++;
 		}
 		int offset = point_distance;
 
-		while (offset * points_per_disjoint + base_id > point_num) {
-			offset--;
-		}
+//		while (offset * points_per_disjoint + base_id > point_num) {
+//			offset--;
+//		}
 
 		for (int i = 0; i < points_per_disjoint; i++) {
 			int pid = base_id + i * offset;
 			int joint_id = i / points_per_joint;
+
+#ifdef DEBUG_
+			out_test << "Cluster " << djcomp_id << " pid = " << pid << " ";
+#endif
 
 			// Moved to the new disjoint, move the origin
 			if (i % points_per_joint == 0) {
@@ -236,6 +400,10 @@ std::string GPUECTest::pointCloudVariationTest(int point_num, int disjoint_comp_
 				}
 			}
 
+#ifdef DEBUG_
+			out_test << "origin =  " << origin << " ";
+#endif
+
 			sample_dist = rand() % SAMPLE_RAND_;
 
 			sample_point = origin;
@@ -247,6 +415,10 @@ std::string GPUECTest::pointCloudVariationTest(int point_num, int disjoint_comp_
 			} else {
 				sample_point.z = origin.z + sample_dist / SAMPLE_DIST_;
 			}
+
+#ifdef DEBUG_
+			out_test << "sample point = " << sample_point << std::endl;
+#endif
 
 			sample_cloud->points[pid] = sample_point;
 			status[pid] = true;
@@ -319,6 +491,10 @@ GPUECTest::SampleCloud GPUECTest::pointCloudGeneration(int point_num, int disjoi
 
 	int pid = 0;
 
+	std::cout << "Disjoint num = " << disjoint_comp_num << std::endl;
+	std::cout << "Joint num = " << joint_comp_num << std::endl;
+	std::cout << "Points per joint = " << points_per_joint << std::endl;
+
 	for (int i = 0; i < disjoint_comp_num; i++) {
 		for (int j = 0; j < joint_comp_num; j++) {
 			for (int k = 0; k < points_per_joint; k++) {
@@ -359,6 +535,9 @@ GPUECTest::SampleCloud GPUECTest::pointCloudGeneration(int point_num, int disjoi
 	output.joint_num_ = joint_comp_num;
 	output.point_distance_ = 1;
 
+	std::cout << "Base cloud test" << std::endl;
+	test(sample_cloud, 1024, d_th);
+
 	return output;
 }
 
@@ -390,9 +569,9 @@ std::string GPUECTest::pointDistanceTest(SampleCloud base_cloud, int point_dista
 		}
 		int offset = point_distance;
 
-		while (offset * points_per_disjoint + base_id > point_num) {
-			offset--;
-		}
+//		while (offset * points_per_disjoint + base_id > point_num) {
+//			offset--;
+//		}
 
 		for (int i = 0; i < points_per_disjoint; i++) {
 			int pid = base_id + i * offset;
@@ -620,7 +799,7 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	gettimeofday(&end, NULL);
 
 	e_total_time += gpu_initial;
-	std::cout << "Edge-based 1: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	std::cout << "E Edge-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters5(e_total_time2, e_graph_time2, e_clustering_time2, e_itr_num2);
@@ -628,7 +807,7 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	gettimeofday(&end, NULL);
 
 	e_total_time2 += gpu_initial;
-	std::cout << "Edge-based 2: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	std::cout << "RS Edge-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters(m_total_time, m_initial, m_build_matrix, m_clustering_time, m_itr_num);
@@ -636,7 +815,7 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	gettimeofday(&end, NULL);
 
 	m_total_time += gpu_initial;
-	std::cout << "Matrix-based 1: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	std::cout << "E Matrix-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters4(m_total_time2, m_initial2, m_build_matrix2, m_clustering_time2, m_itr_num2);
@@ -644,7 +823,7 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	gettimeofday(&end, NULL);
 
 	m_total_time2 += gpu_initial;
-	std::cout << "Matrix-based 2: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	std::cout << "RS Matrix-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters2(v_total_time, v_graph_time, v_clustering_time, v_itr_num);
@@ -652,7 +831,7 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	gettimeofday(&end, NULL);
 
 	v_total_time += gpu_initial;
-	std::cout << "Vertex-based 1: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	std::cout << "E Vertex-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters6(v_total_time2, v_graph_time2, v_clustering_time2, v_itr_num2);
@@ -660,7 +839,7 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	gettimeofday(&end, NULL);
 
 	v_total_time2 += gpu_initial;
-	std::cout << "Vertex-based 2: total exec time = " <<gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	std::cout << "RS Vertex-based: total exec time = " <<gpu_initial + timeDiff(start, end) << std::endl << std::endl;
 
 	gettimeofday(&start, NULL);
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
@@ -680,10 +859,12 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 
 	gettimeofday(&end, NULL);
 
+	std::cout << "PCL Cluster num = " << cluster_indices.size() << std::endl;
+
 	c_total_time = timeDiff(start, end);
 	c_clustering_time = c_total_time - c_tree_build;
 
-	std::cout << "CPU: total exec time = " << c_total_time << std::endl << std::endl;
+	std::cout << "PCL: total exec time = " << c_total_time << std::endl << std::endl;
 
 	// Total execution time
 	output << e_total_time << "," << m_total_time << "," << v_total_time << "," << e_total_time2 << "," << m_total_time2 << "," << v_total_time2 << "," << c_total_time << ",";

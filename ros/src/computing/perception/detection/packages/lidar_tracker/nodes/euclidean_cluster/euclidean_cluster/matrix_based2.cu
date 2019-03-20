@@ -6,8 +6,11 @@
 
 void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &initial_time, long long &build_matrix, long long &clustering_time, int &iteration_num)
 {
+#ifdef DEBUG_
 	std::cout << "MATRIX-BASED 2: Use octree" << std::endl;
+#endif
 	total_time = initial_time = build_matrix = clustering_time = 0;
+	iteration_num = 0;
 
 	struct timeval start, end;
 
@@ -71,10 +74,22 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 	bool is_zero = false;
 
 	GVoxelGrid voxel_grid(x_, y_, z_, point_num_, threshold_, threshold_, threshold_);
+	gettimeofday(&end, NULL);
 
+#ifdef DEBUG_
+	std::cout << "Build Voxel grid = " << timeDiff(start, end) << std::endl;
+#endif
+	build_matrix = timeDiff(start, end);
+	total_time += timeDiff(start, end);
+
+	gettimeofday(&start, NULL);
 	voxel_grid.createLabeledMatrix(cluster_name_, cluster_num_, &matrix, &is_zero, threshold_);
 
 	gettimeofday(&end, NULL);
+
+#ifdef DEBUG_
+	std::cout << "Build Label Matrix only = " << timeDiff(start, end) << std::endl;
+#endif
 
 	build_matrix = timeDiff(start, end);
 	total_time += timeDiff(start, end);
@@ -89,7 +104,9 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 		checkCudaErrors(cudaFree(cluster_list));
 		checkCudaErrors(cudaFree(check));
 
+#ifdef DEBUG_
 		std::cout << "FINAL CLUSTER NUM = " << cluster_num_ << std::endl << std::endl;
+#endif
 
 		return;
 	}
@@ -194,8 +211,6 @@ void GpuEuclideanCluster2::extractClusters4(long long &total_time, long long &in
 	gettimeofday(&start, NULL);
 //	renamingClusters(cluster_name_, cluster_location, point_num_);
 	applyClusterChangedWrapper(cluster_name_, cluster_list, cluster_location, point_num_);
-
-	checkCudaErrors(cudaMemcpy(cluster_name_host_, cluster_name_, point_num_ * sizeof(int), cudaMemcpyDeviceToHost));
 
 	checkCudaErrors(cudaFree(matrix));
 	checkCudaErrors(cudaFree(cluster_list));

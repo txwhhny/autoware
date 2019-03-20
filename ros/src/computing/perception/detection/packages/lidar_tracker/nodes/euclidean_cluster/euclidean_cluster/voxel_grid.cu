@@ -4,6 +4,7 @@
 #include <iostream>
 
 #define BLOCK_SIZE_X (1024)
+//#define DEBUG_ 1
 
 GVoxelGrid::GVoxelGrid():
 	x_(NULL),
@@ -232,11 +233,17 @@ __global__ void collectNonEmptyVoxels(int *vid_of_point, int point_num, int *wri
 
 void GVoxelGrid::insertPointsToVoxels()
 {
+#ifdef DEBUG_
+	struct timeval start, end;
+#endif
 	int block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
 	int grid_x = (point_num_ - 1) / block_x + 1;
 
 	int *vid_of_point;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	checkCudaErrors(cudaMalloc(&vid_of_point, sizeof(int) * point_num_));
 
 	computeVoxelId<<<grid_x, block_x>>>(x_, y_, z_, point_num_,	vid_of_point,
@@ -245,10 +252,29 @@ void GVoxelGrid::insertPointsToVoxels()
 											min_b_x_, min_b_y_, min_b_z_);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
 
+	std::cout << "ComputeVoxelId = " << timeDiff(start, end) << std::endl;
+#endif
+
+
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	GUtilities::sortByKey(vid_of_point, point_ids_, point_num_);
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "sortbyKey = " << timeDiff(start, end) << std::endl;
+#endif
 
 	int *mark;
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 
 	checkCudaErrors(cudaMalloc(&mark, sizeof(int) * (point_num_ + 1)));
 
@@ -256,6 +282,15 @@ void GVoxelGrid::insertPointsToVoxels()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "markNonEmpty = " << timeDiff(start, end) << std::endl;
+#endif
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	GUtilities::exclusiveScan(mark, point_num_ + 1, &voxel_num_);
 
 	checkCudaErrors(cudaMalloc(&voxel_ids_, sizeof(int) * voxel_num_));
@@ -265,8 +300,18 @@ void GVoxelGrid::insertPointsToVoxels()
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "collectNonEmpty = " << timeDiff(start, end) << std::endl;
+#endif
+
 	checkCudaErrors(cudaFree(vid_of_point));
 	checkCudaErrors(cudaFree(mark));
+
+#ifdef DEBUG_
+	std::cout << "Voxel num = " << voxel_num_ << std::endl;
+#endif
 }
 
 
@@ -422,6 +467,9 @@ __global__ void neighborsSearch(float *x, float *y, float *z, int point_num,
 
 void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, int *neighbor_num, float radius, bool search_all)
 {
+#ifdef DEBUG_
+	struct timeval start, end;
+#endif
 	int block_x, grid_x;
 
 
@@ -432,13 +480,27 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
 	grid_x = (point_num_ * 27 - 1) / block_x + 1;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
+
 	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "init candidate vids = " << timeDiff(start, end) << std::endl;
+#endif
+
+
 	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
 											vgrid_x_, vgrid_y_, vgrid_z_,
 											voxel_x_, voxel_y_, voxel_z_,
@@ -449,8 +511,18 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-	checkCudaErrors(cudaMalloc(starting_neighbor_ids, sizeof(int) * (point_num_ + 1)));
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
 
+	std::cout << "boundariesSearch = " << timeDiff(start, end) << std::endl;
+#endif
+
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
+
+	checkCudaErrors(cudaMalloc(starting_neighbor_ids, sizeof(int) * (point_num_ + 1)));
 
 	neighborsCount<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
 											candidate_vids,
@@ -458,6 +530,12 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 											*starting_neighbor_ids, radius, search_all);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+
+	gettimeofday(&end, NULL);
+
+	std::cout << "neighborCount = " << timeDiff(start, end) << std::endl;
+
 
 	GUtilities::exclusiveScan(*starting_neighbor_ids, point_num_ + 1, neighbor_num);
 
@@ -472,6 +550,7 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 
 	checkCudaErrors(cudaMalloc(neighbor_ids, sizeof(int) * (*neighbor_num)));
 
+	gettimeofday(&start, NULL);
 	neighborsSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
 											candidate_vids,
 											starting_point_ids_, point_ids_,
@@ -480,6 +559,11 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 											radius, search_all);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+	gettimeofday(&end, NULL);
+
+	std::cout << "neighborrSearches = " << timeDiff(start, end) << std::endl;
+
 
 	checkCudaErrors(cudaFree(candidate_vids));
 }
@@ -526,6 +610,8 @@ __global__ void edgeSetBuild(float *x, float *y, float *z, int point_num,
  */
 void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 {
+	struct timeval start, end;
+
 	int block_x, grid_x;
 
 
@@ -536,13 +622,20 @@ void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
 	grid_x = (point_num_ * 27 - 1) / block_x + 1;
 
+	gettimeofday(&start, NULL);
+
 	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+	gettimeofday(&end, NULL);
+
+	std::cout << "init candidate vids = " << timeDiff(start, end) << std::endl;
+
 	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
+	gettimeofday(&start, NULL);
 	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
 											vgrid_x_, vgrid_y_, vgrid_z_,
 											voxel_x_, voxel_y_, voxel_z_,
@@ -553,17 +646,28 @@ void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+	gettimeofday(&end, NULL);
+
+	std::cout << "boundariesSearch = " << timeDiff(start, end) << std::endl;
+
+
 	int *starting_neighbor_ids;
 
 	checkCudaErrors(cudaMalloc(&starting_neighbor_ids, sizeof(int) * (point_num_ + 1)));
 
 
+	gettimeofday(&start, NULL);
 	neighborsCount<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
 											candidate_vids,
 											starting_point_ids_, point_ids_,
 											starting_neighbor_ids, radius, false);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+	gettimeofday(&end, NULL);
+
+	std::cout << "NeighborCount = " << timeDiff(start, end) << std::endl;
+
 
 	GUtilities::exclusiveScan(starting_neighbor_ids, point_num_ + 1, edge_num);
 
@@ -577,12 +681,18 @@ void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 
 	checkCudaErrors(cudaMalloc(edge_set, sizeof(int2) * (*edge_num)));
 
+	gettimeofday(&start, NULL);
 	edgeSetBuild<<<grid_x, block_x>>>(x_, y_, z_, point_num_, candidate_vids,
 										starting_point_ids_, point_ids_,
 										starting_neighbor_ids, *edge_set,
 										radius);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+	gettimeofday(&end, NULL);
+
+	std::cout << "edgeSetBuild = " << timeDiff(start, end) << std::endl;
+
 
 	checkCudaErrors(cudaFree(candidate_vids));
 	checkCudaErrors(cudaFree(starting_neighbor_ids));
@@ -632,6 +742,7 @@ __global__ void matrixBuild(float *x, float *y, float *z, int point_num,
 	}
 }
 
+//#define DEBUG2_ 1
 void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **matrix, bool *is_zero, float radius)
 {
 	if (label_num == 0) {
@@ -639,14 +750,20 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 		return;
 	}
 
+#ifdef DEBUG2_
 	struct timeval start, end;
 
 	gettimeofday(&start, NULL);
+#endif
+
 	checkCudaErrors(cudaMalloc(matrix, sizeof(int) * label_num * label_num));
 	checkCudaErrors(cudaMemset(*matrix, 0, sizeof(int) * label_num * label_num));
+
+#ifdef DEBUG2_
 	gettimeofday(&end, NULL);
 
 	std::cout << "Matrix memset = " << timeDiff(start, end) << std::endl;
+#endif
 
 	// neighbor search and set to matrix
 	int block_x, grid_x;
@@ -658,19 +775,28 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
 	grid_x = (point_num_ * 27 - 1) / block_x + 1;
 
+#ifdef DEBUG2_
 	gettimeofday(&start, NULL);
+#endif
+
 	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+#ifdef DEBUG2_
 	gettimeofday(&end, NULL);
 
 	std::cout << "initCandidateVids = " << timeDiff(start, end) << std::endl;
+#endif
 
 
 	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
+#ifdef DEBUG2_
 	gettimeofday(&start, NULL);
+#endif
+
 	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
 											vgrid_x_, vgrid_y_, vgrid_z_,
 											voxel_x_, voxel_y_, voxel_z_,
@@ -680,9 +806,12 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 											candidate_vids);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+#ifdef DEBUG2_
 	gettimeofday(&end, NULL);
 
 	std::cout << "boundariesSearch = " << timeDiff(start, end) << std::endl;
+#endif
 
 	bool *g_is_zero;
 
@@ -692,16 +821,22 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 
 	checkCudaErrors(cudaMemcpy(g_is_zero, is_zero, sizeof(bool), cudaMemcpyHostToDevice));
 
+#ifdef DEBUG2_
 	gettimeofday(&start, NULL);
+#endif
+
 	matrixBuild<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
 										candidate_vids,
 										starting_point_ids_, point_ids_,
 										point_labels, label_num, *matrix, g_is_zero, radius);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
+
+#ifdef DEBUG2_
 	gettimeofday(&end, NULL);
 
 	std::cout << "matrixBuild = " << timeDiff(start, end) << std::endl;
+#endif
 
 	checkCudaErrors(cudaMemcpy(is_zero, g_is_zero, sizeof(bool), cudaMemcpyDeviceToHost));
 
