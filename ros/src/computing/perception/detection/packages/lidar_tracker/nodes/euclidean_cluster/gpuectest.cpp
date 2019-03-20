@@ -246,7 +246,6 @@ void GPUECTest::pointCloudVariationTest()
 	}
 	test_result << std::endl << std::endl << std::endl;
 
-
 	std::cout << "########################### Point Distance Variation Test ###########################" << std::endl;
 	test_result << "***** Point Distance Variation Test *****" << std::endl;
 	test_result << "Point distance varies point num = 65536 disjoint num = 256 joint_num = 32" << std::endl;
@@ -261,12 +260,6 @@ void GPUECTest::pointCloudVariationTest()
 	disjoint_comp_num = 256;
 	point_degree = 32;
 
-//	for (point_distance = 1; point_distance <= 2048; point_distance += 7) {
-//		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
-//		test_result << point_distance << "," << res << std::endl;
-//	}
-
-
 	joint_comp_num = (point_num / disjoint_comp_num) / point_degree;
 	SampleCloud base_cloud = pointCloudGeneration(point_num, disjoint_comp_num, joint_comp_num);
 	for (point_distance = 1; point_distance <= 256; point_distance *= 2) {
@@ -275,6 +268,14 @@ void GPUECTest::pointCloudVariationTest()
 	}
 
 	test_result << std::endl << std::endl << std::endl;
+
+//	for (point_distance = 256; point_distance >= 1; point_distance /= 2) {
+//		std::cout << "**** POINT DISTANCE = " << point_distance << " ***" << std::endl;
+//		std::string res = pointDistanceTest(base_cloud, point_distance);
+//		test_result << point_distance << "," << res << std::endl;
+//	}
+//
+//	test_result << std::endl << std::endl << std::endl;
 
 	// Point distance variation, others are fixed
 	std::cout << "########################### Point Distance Variation Test ###########################" << std::endl;
@@ -290,11 +291,6 @@ void GPUECTest::pointCloudVariationTest()
 	disjoint_comp_num = 1024;
 	joint_comp_num = 32;
 
-//	for (point_distance = 1; point_distance <= 2048; point_distance += 7) {
-//		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
-//		test_result << point_distance << "," << res << std::endl;
-//	}
-
 	base_cloud = pointCloudGeneration(point_num, disjoint_comp_num, joint_comp_num);
 	for (point_distance = 1; point_distance <= 1024; point_distance *= 2) {
 		std::string res = pointDistanceTest(base_cloud, point_distance);
@@ -302,6 +298,14 @@ void GPUECTest::pointCloudVariationTest()
 	}
 
 	test_result << std::endl << std::endl << std::endl;
+
+//	for (point_distance = 1024; point_distance >= 1; point_distance /= 2) {
+//		std::cout << "**** POINT DISTANCE = " << point_distance << " ***" << std::endl;
+//		std::string res = pointDistanceTest(base_cloud, point_distance);
+//		test_result << point_distance << "," << res << std::endl;
+//	}
+//
+//	test_result << std::endl << std::endl << std::endl;
 
 	// Point distance variation, others are fixed
 	std::cout << "########################### Point Distance Variation Test ###########################" << std::endl;
@@ -316,11 +320,6 @@ void GPUECTest::pointCloudVariationTest()
 	disjoint_comp_num = 2048;
 	joint_comp_num = 32;
 
-//	for (point_distance = 1; point_distance <= 2048; point_distance += 7) {
-//		std::string res = pointCloudVariationTest(point_num, disjoint_comp_num, joint_comp_num, point_distance);
-//		test_result << point_distance << "," << res << std::endl;
-//	}
-
 	base_cloud = pointCloudGeneration(point_num, disjoint_comp_num, joint_comp_num);
 	for (point_distance = 1; point_distance <= 512; point_distance *= 2) {
 		std::string res = pointDistanceTest(base_cloud, point_distance);
@@ -329,23 +328,32 @@ void GPUECTest::pointCloudVariationTest()
 
 	test_result << std::endl << std::endl << std::endl;
 
-	std::cout << "END OF POINT CLOUD VARIATION TEST" << std::endl;
-
-	std::cout << "***** LINE TEST *****" << std::endl;
-
-	// Line test
-	point_num = 1048576;
-
-	test_result << "***** LINE TEST *****" << std::endl;
-
-	test_result << "Point distance, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
-	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
-	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
-
-
-	test_result << lineTest(point_num);
+//	for (point_distance = 512; point_distance >= 1; point_distance /= 2) {
+//		std::cout << "**** POINT DISTANCE = " << point_distance << " ***" << std::endl;
+//		std::string res = pointDistanceTest(base_cloud, point_distance);
+//		test_result << point_distance << "," << res << std::endl;
+//	}
+//
+//	test_result << std::endl << std::endl << std::endl;
 
 	std::cout << "END OF POINT CLOUD VARIATION TEST" << std::endl;
+
+	exit(1);
+//	std::cout << "***** LINE TEST *****" << std::endl;
+//
+//	// Line test
+//	point_num = 1048576;
+//
+//	test_result << "***** LINE TEST *****" << std::endl;
+//
+//	test_result << "Point distance, E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based, PCL, ";
+//	test_result << "E Edge-based,,, E Matrix-based,,,, E Vertex-based,,, RS Edge-based,,, RS Matrix-based,,,, RS Vertex-based,,, PCL,, ";
+//	test_result << "E Edge-based, E Matrix-based, E Vertex-based, RS Edge-based, RS Matrix-based, RS Vertex-based" << std::endl;
+//
+//
+//	test_result << lineTest(point_num);
+//
+//	std::cout << "END OF POINT CLOUD VARIATION TEST" << std::endl;
 }
 
 std::string GPUECTest::pointCloudVariationTest(int point_num, int disjoint_comp_num, int joint_comp_num, int point_distance)
@@ -536,7 +544,7 @@ GPUECTest::SampleCloud GPUECTest::pointCloudGeneration(int point_num, int disjoi
 	output.point_distance_ = 1;
 
 	std::cout << "Base cloud test" << std::endl;
-	test(sample_cloud, 1024, d_th);
+	//test(sample_cloud, 1024, d_th);
 
 	return output;
 }
@@ -758,11 +766,85 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 {
 	std::ostringstream output;
 
+	long long e_set_input, e_total_time, e_graph_time, e_clustering_time;
+	int e_itr_num;
+
+	long long e_set_input2, e_total_time2, e_graph_time2, e_clustering_time2;
+	int e_itr_num2;
+
+	long long m_set_input, m_total_time, m_initial, m_build_matrix, m_clustering_time;
+	int m_itr_num;
+
+	long long m_set_input2, m_total_time2, m_initial2, m_build_matrix2, m_clustering_time2;
+	int m_itr_num2;
+
+	long long v_set_input, v_total_time, v_graph_time, v_clustering_time;
+	int v_itr_num;
+
+	long long v_set_input2, v_total_time2, v_graph_time2, v_clustering_time2;
+	int v_itr_num2;
+
+	long long c_total_time, c_clustering_time, c_tree_build;
+	int *tmp;
+
+	cudaMalloc(&tmp, sizeof(int));
+	evertexBasedTest(input, block_size, threshold, v_total_time, v_set_input, v_graph_time, v_clustering_time, v_itr_num);
+	cudaDeviceReset();
+
+	cudaMalloc(&tmp, sizeof(int));
+	rsvertexBasedTest(input, block_size, threshold, v_total_time2, v_set_input2, v_graph_time2, v_clustering_time2, v_itr_num2);
+	cudaDeviceReset();
+
+	cudaMalloc(&tmp, sizeof(int));
+	eedgeBasedTest(input, block_size, threshold, e_total_time, e_set_input, e_graph_time, e_clustering_time, e_itr_num);
+	cudaDeviceReset();
+
+	cudaMalloc(&tmp, sizeof(int));
+	rsedgeBasedTest(input, block_size, threshold, e_total_time2, e_set_input2, e_graph_time2, e_clustering_time2, e_itr_num2);
+	cudaDeviceReset();
+
+	cudaMalloc(&tmp, sizeof(int));
+	ematrixBasedTest(input, block_size, threshold, m_total_time, m_set_input, m_initial, m_build_matrix, m_clustering_time, m_itr_num);
+	cudaDeviceReset();
+
+	cudaMalloc(&tmp, sizeof(int));
+	rsmatrixBasedTest(input, block_size, threshold, m_total_time2, m_set_input2, m_initial2, m_build_matrix2, m_clustering_time2, m_itr_num2);
+	cudaDeviceReset();
+
+	cpuBasedTest(input, threshold, c_total_time, c_clustering_time, c_tree_build);
+
+
+	// Total execution time
+	output << e_total_time << "," << m_total_time << "," << v_total_time << "," << e_total_time2 << "," << m_total_time2 << "," << v_total_time2 << "," << c_total_time << ",";
+
+	// Breakdown
+	output << e_set_input << "," << e_graph_time << "," << e_clustering_time << ",";
+	output << m_set_input << "," << m_initial << "," << m_build_matrix << "," << m_clustering_time << ",";
+	output << v_set_input << "," << v_graph_time << ","  << v_clustering_time << ",";
+
+	output << e_set_input2 << "," << e_graph_time2 << "," << e_clustering_time2 << ",";
+	output << m_set_input2 << "," << m_initial2 << "," << m_build_matrix2 << "," << m_clustering_time2 << ",";
+	output << v_set_input2 << "," << v_graph_time2 << ","  << v_clustering_time2 << ",";
+
+
+	// Cpu-based
+	output << c_tree_build << "," << c_clustering_time << ",";
+
+	// Iteration number
+	output << e_itr_num << "," << m_itr_num << "," << v_itr_num << "," << e_itr_num2 << "," << m_itr_num2 << "," << v_itr_num2;
+
+	// Speedup rate
+
+	return output.str();
+}
+
+void GPUECTest::eedgeBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+								long long &e_total_time, long long &e_set_input, long long &e_graph_time, long long &e_clustering_time,
+								int &e_itr_num)
+{
 	struct timeval start, end;
 
 	GpuEuclideanCluster2 test_sample;
-
-	long long gpu_initial;
 
 	gettimeofday(&start, NULL);
 	test_sample.setBlockSizeX(1024);
@@ -770,76 +852,148 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	test_sample.setInputPoints(input);
 	gettimeofday(&end, NULL);
 
-	gpu_initial = timeDiff(start, end);
-
-
-	long long e_total_time, e_graph_time, e_clustering_time;
-	int e_itr_num;
-
-	long long e_total_time2, e_graph_time2, e_clustering_time2;
-	int e_itr_num2;
-
-	long long m_total_time, m_initial, m_build_matrix, m_clustering_time;
-	int m_itr_num;
-
-	long long m_total_time2, m_initial2, m_build_matrix2, m_clustering_time2;
-	int m_itr_num2;
-
-	long long v_total_time, v_graph_time, v_clustering_time;
-	int v_itr_num;
-
-	long long v_total_time2, v_graph_time2, v_clustering_time2;
-	int v_itr_num2;
-
-	long long c_total_time, c_clustering_time, c_tree_build;
+	e_set_input = timeDiff(start, end);
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters3(e_total_time, e_graph_time, e_clustering_time, e_itr_num);
 	test_sample.getOutput();
 	gettimeofday(&end, NULL);
 
-	e_total_time += gpu_initial;
-	std::cout << "E Edge-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	e_total_time += e_set_input;
+	std::cout << "E Edge-based: total exec time = " << e_set_input + timeDiff(start, end) << std::endl << std::endl;
+}
+
+void GPUECTest::rsedgeBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+								long long &e_total_time, long long &e_set_input, long long &e_graph_time, long long &e_clustering_time,
+								int &e_itr_num)
+{
+	struct timeval start, end;
+
+	GpuEuclideanCluster2 test_sample;
 
 	gettimeofday(&start, NULL);
-	test_sample.extractClusters5(e_total_time2, e_graph_time2, e_clustering_time2, e_itr_num2);
+	test_sample.setBlockSizeX(1024);
+	test_sample.setThreshold(threshold);
+	test_sample.setInputPoints(input);
+	gettimeofday(&end, NULL);
+
+	e_set_input = timeDiff(start, end);
+
+
+	gettimeofday(&start, NULL);
+	test_sample.extractClusters5(e_total_time, e_graph_time, e_clustering_time, e_itr_num);
 	test_sample.getOutput();
 	gettimeofday(&end, NULL);
 
-	e_total_time2 += gpu_initial;
-	std::cout << "RS Edge-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	e_total_time += e_set_input;
+	std::cout << "RS Edge-based: total exec time = " << e_set_input + timeDiff(start, end) << std::endl << std::endl;
+}
+
+
+void GPUECTest::ematrixBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+								long long &m_total_time, long long &m_set_input, long long &m_initial, long long &m_build_matrix,
+								long long &m_clustering_time, int &m_itr_num)
+{
+	struct timeval start, end;
+
+	GpuEuclideanCluster2 test_sample;
+
+	gettimeofday(&start, NULL);
+	test_sample.setBlockSizeX(block_size);
+	test_sample.setThreshold(threshold);
+	test_sample.setInputPoints(input);
+	gettimeofday(&end, NULL);
+
+	m_set_input = timeDiff(start, end);
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters(m_total_time, m_initial, m_build_matrix, m_clustering_time, m_itr_num);
 	test_sample.getOutput();
 	gettimeofday(&end, NULL);
 
-	m_total_time += gpu_initial;
-	std::cout << "E Matrix-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	m_total_time += m_set_input;
+	std::cout << "E Matrix-based: total exec time = " << m_set_input + timeDiff(start, end) << std::endl << std::endl;
+}
+
+void GPUECTest::rsmatrixBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+								long long &m_total_time, long long &m_set_input, long long &m_initial, long long &m_build_matrix,
+								long long &m_clustering_time, int &m_itr_num)
+{
+	struct timeval start, end;
+
+	GpuEuclideanCluster2 test_sample;
 
 	gettimeofday(&start, NULL);
-	test_sample.extractClusters4(m_total_time2, m_initial2, m_build_matrix2, m_clustering_time2, m_itr_num2);
+	test_sample.setBlockSizeX(block_size);
+	test_sample.setThreshold(threshold);
+	test_sample.setInputPoints(input);
+	gettimeofday(&end, NULL);
+
+	m_set_input = timeDiff(start, end);
+
+	gettimeofday(&start, NULL);
+	test_sample.extractClusters4(m_total_time, m_initial, m_build_matrix, m_clustering_time, m_itr_num);
 	test_sample.getOutput();
 	gettimeofday(&end, NULL);
 
-	m_total_time2 += gpu_initial;
-	std::cout << "RS Matrix-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	m_total_time += m_set_input;
+	std::cout << "RS Matrix-based: total exec time = " << m_set_input + timeDiff(start, end) << std::endl << std::endl;
+}
+
+void GPUECTest::evertexBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+								long long &v_total_time, long long &v_set_input, long long &v_graph_time, long long &v_clustering_time,
+								int &v_itr_num)
+{
+	struct timeval start, end;
+
+	GpuEuclideanCluster2 test_sample;
+
+	gettimeofday(&start, NULL);
+	test_sample.setBlockSizeX(block_size);
+	test_sample.setThreshold(threshold);
+	test_sample.setInputPoints(input);
+	gettimeofday(&end, NULL);
+
+	v_set_input = timeDiff(start, end);
 
 	gettimeofday(&start, NULL);
 	test_sample.extractClusters2(v_total_time, v_graph_time, v_clustering_time, v_itr_num);
 	test_sample.getOutput();
 	gettimeofday(&end, NULL);
 
-	v_total_time += gpu_initial;
-	std::cout << "E Vertex-based: total exec time = " << gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	v_total_time += v_set_input;
+	std::cout << "E Vertex-based: total exec time = " << v_set_input + timeDiff(start, end) << std::endl << std::endl;
+}
+
+void GPUECTest::rsvertexBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+								long long &v_total_time, long long &v_set_input, long long &v_graph_time, long long &v_clustering_time,
+								int &v_itr_num)
+{
+	struct timeval start, end;
+
+	GpuEuclideanCluster2 test_sample;
 
 	gettimeofday(&start, NULL);
-	test_sample.extractClusters6(v_total_time2, v_graph_time2, v_clustering_time2, v_itr_num2);
+	test_sample.setBlockSizeX(block_size);
+	test_sample.setThreshold(threshold);
+	test_sample.setInputPoints(input);
+	gettimeofday(&end, NULL);
+
+	v_set_input = timeDiff(start, end);
+
+	gettimeofday(&start, NULL);
+	test_sample.extractClusters6(v_total_time, v_graph_time, v_clustering_time, v_itr_num);
 	test_sample.getOutput();
 	gettimeofday(&end, NULL);
 
-	v_total_time2 += gpu_initial;
-	std::cout << "RS Vertex-based: total exec time = " <<gpu_initial + timeDiff(start, end) << std::endl << std::endl;
+	v_total_time += v_set_input;
+	std::cout << "E Vertex-based: total exec time = " << v_set_input + timeDiff(start, end) << std::endl << std::endl;
+}
+
+void GPUECTest::cpuBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, float threshold,
+								long long &c_total_time, long long &c_clustering_time, long long &c_tree_build)
+{
+	struct timeval start, end;
 
 	gettimeofday(&start, NULL);
 	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
@@ -865,27 +1019,4 @@ std::string GPUECTest::test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block
 	c_clustering_time = c_total_time - c_tree_build;
 
 	std::cout << "PCL: total exec time = " << c_total_time << std::endl << std::endl;
-
-	// Total execution time
-	output << e_total_time << "," << m_total_time << "," << v_total_time << "," << e_total_time2 << "," << m_total_time2 << "," << v_total_time2 << "," << c_total_time << ",";
-
-	// Breakdown
-	output << gpu_initial << "," << e_graph_time << "," << e_clustering_time << ",";
-	output << gpu_initial << "," << m_initial << "," << m_build_matrix << "," << m_clustering_time << ",";
-	output << gpu_initial << "," << v_graph_time << ","  << v_clustering_time << ",";
-
-	output << gpu_initial << "," << e_graph_time2 << "," << e_clustering_time2 << ",";
-	output << gpu_initial << "," << m_initial2 << "," << m_build_matrix2 << "," << m_clustering_time2 << ",";
-	output << gpu_initial << "," << v_graph_time2 << ","  << v_clustering_time2 << ",";
-
-
-	// Cpu-based
-	output << c_tree_build << "," << c_clustering_time << ",";
-
-	// Iteration number
-	output << e_itr_num << "," << m_itr_num << "," << v_itr_num << "," << e_itr_num2 << "," << m_itr_num2 << "," << v_itr_num2;
-
-	// Speedup rate
-
-	return output.str();
 }

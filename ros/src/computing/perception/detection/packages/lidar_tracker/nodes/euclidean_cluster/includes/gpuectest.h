@@ -46,6 +46,35 @@ private:
 	static std::string variousSizeClusterTest(int point_num, int disjoint_comp_num, int point_num_per_joint, int common_diff);
 
 	static std::string test(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold);
+
+	static void eedgeBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+									long long &e_total_time, long long &e_set_input, long long &e_graph_time, long long &e_clustering_time,
+									int &e_itr_num);
+
+	static void rsedgeBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+									long long &e_total_time, long long &e_set_input, long long &e_graph_time, long long &e_clustering_time,
+									int &e_itr_num);
+
+
+	static void ematrixBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+									long long &m_total_time, long long &m_set_input, long long &m_initial, long long &m_build_matrix, long long &m_clustering_time,
+									int &m_itr_num);
+
+	static void rsmatrixBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+									long long &m_total_time, long long &m_set_input, long long &m_initial, long long &m_build_matrix, long long &m_clustering_time,
+									int &m_itr_num);
+
+	static void evertexBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+									long long &v_total_time, long long &v_set_input, long long &v_graph_time, long long &v_clustering_time,
+									int &v_itr_num);
+
+	static void rsvertexBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, int block_size, float threshold,
+									long long &v_total_time, long long &v_set_input, long long &v_graph_time, long long &v_clustering_time,
+									int &v_itr_num);
+
+	static void cpuBasedTest(pcl::PointCloud<pcl::PointXYZ>::Ptr input, float threshold,
+									long long &c_total_time, long long &c_clustering_time, long long &c_tree_build);
+
 };
 
 #ifndef timeDiff

@@ -59,39 +59,82 @@ __global__ void convertFormat(pcl::PointXYZ *input, float *out_x, float *out_y, 
 
 void GpuEuclideanCluster2::setInputPoints(pcl::PointCloud<pcl::PointXYZ>::Ptr input)
 {
-	if (x_ != NULL)
+	if (x_ != NULL) {
 		checkCudaErrors(cudaFree(x_));
+		x_ = NULL;
+	}
 
-	if (y_ != NULL)
+	if (y_ != NULL) {
 		checkCudaErrors(cudaFree(y_));
+		y_ = NULL;
+	}
 
-	if (z_ != NULL)
+	if (z_ != NULL) {
 		checkCudaErrors(cudaFree(z_));
+		z_ = NULL;
+	}
 
 	if (input->size() > 0) {
 		point_num_ = input->size();
 		padded_num_ = ((point_num_ - 1) / block_size_x_ + 1) * block_size_x_;
+#ifdef DEBUG_
+		struct timeval start, end;
+
+		gettimeofday(&start, NULL);
+#endif
 		checkCudaErrors(cudaMalloc(&x_, sizeof(float) * padded_num_));
 		checkCudaErrors(cudaMalloc(&y_, sizeof(float) * padded_num_));
 		checkCudaErrors(cudaMalloc(&z_, sizeof(float) * padded_num_));
 
+#ifdef DEBUG_
+		gettimeofday(&end, NULL);
+
+		std::cout << "xyz Malloc = " << timeDiff(start, end) << std::endl;
+#endif
+
 		pcl::PointXYZ *dev_tmp_input;
 
+#ifdef DEBUG_
+		gettimeofday(&start, NULL);
+#endif
 		checkCudaErrors(cudaMalloc(&dev_tmp_input, sizeof(pcl::PointXYZ) * point_num_));
 		checkCudaErrors(cudaMemcpy(dev_tmp_input, input->points.data(), sizeof(pcl::PointXYZ) * point_num_, cudaMemcpyHostToDevice));
+
+#ifdef DEBUG_
+		gettimeofday(&end, NULL);
+
+		std::cout << "malloc devtmp_input = " << timeDiff(start, end) << std::endl;
+#endif
 
 		int block_x = (point_num_ > block_size_x_) ? block_size_x_ : point_num_;
 		int grid_x = (point_num_ - 1) / block_x + 1;
 
+#ifdef DEBUG_
+		gettimeofday(&start, NULL);
+#endif
 		convertFormat<<<grid_x, block_x>>>(dev_tmp_input, x_, y_, z_, point_num_);
 		checkCudaErrors(cudaGetLastError());
 		checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
+		gettimeofday(&end, NULL);
+
+		std::cout << "ConvertFormat = " << timeDiff(start, end) << std::endl;
+#endif
+
 		checkCudaErrors(cudaFree(dev_tmp_input));
 
-
+#ifdef DEBUG_
+		gettimeofday(&start, NULL);
+#endif
 		checkCudaErrors(cudaMalloc(&cluster_name_, point_num_ * sizeof(int)));
 		cluster_name_host_ = (int*)malloc(point_num_ * sizeof(int));
+
+#ifdef DEBUG_
+		gettimeofday(&end, NULL);
+
+		std::cout << "malloc cluster names = " << timeDiff(start, end) << std::endl;
+#endif
 	}
 }
 
@@ -173,22 +216,27 @@ GpuEuclideanCluster2::~GpuEuclideanCluster2()
 {
 	if (x_ != NULL) {
 		checkCudaErrors(cudaFree(x_));
+		x_= NULL;
 	}
 
 	if (y_ != NULL) {
 		checkCudaErrors(cudaFree(y_));
+		y_ = NULL;
 	}
 
 	if (z_ != NULL) {
 		checkCudaErrors(cudaFree(z_));
+		z_ = NULL;
 	}
 
 	if (cluster_name_ != NULL) {
 		checkCudaErrors(cudaFree(cluster_name_));
+		cluster_name_ = NULL;
 	}
 
 	if (cluster_name_host_ != NULL) {
 		free(cluster_name_host_);
+		cluster_name_host_ = NULL;
 	}
 }
 

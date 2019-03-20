@@ -4,7 +4,6 @@
 #include <iostream>
 
 #define BLOCK_SIZE_X (1024)
-//#define DEBUG_ 1
 
 GVoxelGrid::GVoxelGrid():
 	x_(NULL),
@@ -54,6 +53,8 @@ GVoxelGrid::GVoxelGrid(float *x, float *y, float *z, int point_num, float voxel_
 	voxel_y_ = voxel_y;
 	voxel_z_ = voxel_z;
 	voxel_ids_ = NULL;
+	starting_point_ids_ = NULL;
+	point_ids_ = NULL;
 
 	checkCudaErrors(cudaMalloc(&point_ids_, sizeof(int) * point_num_));
 
@@ -64,11 +65,18 @@ GVoxelGrid::GVoxelGrid(float *x, float *y, float *z, int point_num, float voxel_
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
 	struct timeval start, end;
 
 	gettimeofday(&start, NULL);
+#endif
+
 	findBoundaries();
+#ifdef DEBUG_
 	gettimeofday(&end, NULL);
+
+	std::cout << "FindBoundaries = " << timeDiff(start, end) << std::endl;
+#endif
 
 	// Allocate empty voxel grid
 
@@ -103,8 +111,15 @@ __global__ void findMin(float *x, float *y, float *z, int full_size, int half_si
 
 void GVoxelGrid::findBoundaries()
 {
+#ifdef DEBUG_
+	struct timeval start, end;
+#endif
+
 	float *max_x, *max_y, *max_z, *min_x, *min_y, *min_z;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	checkCudaErrors(cudaMalloc(&max_x, sizeof(float) * point_num_));
 	checkCudaErrors(cudaMalloc(&max_y, sizeof(float) * point_num_));
 	checkCudaErrors(cudaMalloc(&max_z, sizeof(float) * point_num_));
@@ -112,6 +127,15 @@ void GVoxelGrid::findBoundaries()
 	checkCudaErrors(cudaMalloc(&min_y, sizeof(float) * point_num_));
 	checkCudaErrors(cudaMalloc(&min_z, sizeof(float) * point_num_));
 
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "malloc min and maxxyz = " << timeDiff(start, end) << std::endl;
+#endif
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	checkCudaErrors(cudaMemcpy(max_x, x_, sizeof(float) * point_num_, cudaMemcpyDeviceToDevice));
 	checkCudaErrors(cudaMemcpy(max_y, y_, sizeof(float) * point_num_, cudaMemcpyDeviceToDevice));
 	checkCudaErrors(cudaMemcpy(max_z, z_, sizeof(float) * point_num_, cudaMemcpyDeviceToDevice));
@@ -120,8 +144,17 @@ void GVoxelGrid::findBoundaries()
 	checkCudaErrors(cudaMemcpy(min_y, y_, sizeof(float) * point_num_, cudaMemcpyDeviceToDevice));
 	checkCudaErrors(cudaMemcpy(min_z, z_, sizeof(float) * point_num_, cudaMemcpyDeviceToDevice));
 
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "memcpy min and maxxyz = " << timeDiff(start, end) << std::endl;
+#endif
+
 	int points_num = point_num_;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	while (points_num > 1) {
 		int half_points_num = (points_num - 1) / 2 + 1;
 		int block_x = (half_points_num > BLOCK_SIZE_X) ? BLOCK_SIZE_X : half_points_num;
@@ -138,6 +171,15 @@ void GVoxelGrid::findBoundaries()
 
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "findMax and min = " << timeDiff(start, end) << std::endl;
+#endif
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	checkCudaErrors(cudaMemcpy(&max_x_, max_x, sizeof(float), cudaMemcpyDeviceToHost));
 	checkCudaErrors(cudaMemcpy(&max_y_, max_y, sizeof(float), cudaMemcpyDeviceToHost));
 	checkCudaErrors(cudaMemcpy(&max_z_, max_z, sizeof(float), cudaMemcpyDeviceToHost));
@@ -145,6 +187,12 @@ void GVoxelGrid::findBoundaries()
 	checkCudaErrors(cudaMemcpy(&min_x_, min_x, sizeof(float), cudaMemcpyDeviceToHost));
 	checkCudaErrors(cudaMemcpy(&min_y_, min_y, sizeof(float), cudaMemcpyDeviceToHost));
 	checkCudaErrors(cudaMemcpy(&min_z_, min_z, sizeof(float), cudaMemcpyDeviceToHost));
+
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "copy max and minxyz = " << timeDiff(start, end) << std::endl;
+#endif
 
 	max_b_x_ = static_cast<int> (floor(max_x_ / voxel_x_));
 	max_b_y_ = static_cast<int> (floor(max_y_ / voxel_y_));
@@ -159,6 +207,10 @@ void GVoxelGrid::findBoundaries()
 	vgrid_z_ = max_b_z_ - min_b_z_ + 1;
 
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
+
 	checkCudaErrors(cudaFree(max_x));
 	checkCudaErrors(cudaFree(max_y));
 	checkCudaErrors(cudaFree(max_z));
@@ -166,6 +218,12 @@ void GVoxelGrid::findBoundaries()
 	checkCudaErrors(cudaFree(min_x));
 	checkCudaErrors(cudaFree(min_y));
 	checkCudaErrors(cudaFree(min_z));
+
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "Free max and minxyz = " << timeDiff(start, end) << std::endl;
+#endif
 }
 
 __device__ int voxelId(float x, float y, float z,
@@ -293,7 +351,16 @@ void GVoxelGrid::insertPointsToVoxels()
 #endif
 	GUtilities::exclusiveScan(mark, point_num_ + 1, &voxel_num_);
 
+	if (voxel_ids_ != NULL) {
+		checkCudaErrors(cudaFree(voxel_ids_));
+		voxel_ids_ = NULL;
+	}
 	checkCudaErrors(cudaMalloc(&voxel_ids_, sizeof(int) * voxel_num_));
+
+	if (starting_point_ids_ != NULL) {
+		checkCudaErrors(cudaFree(starting_point_ids_));
+		starting_point_ids_ = NULL;
+	}
 	checkCudaErrors(cudaMalloc(&starting_point_ids_, sizeof(int) * (voxel_num_ + 1)));
 
 	collectNonEmptyVoxels<<<grid_x, block_x>>>(vid_of_point, point_num_, mark, voxel_ids_, starting_point_ids_);
@@ -387,11 +454,11 @@ __global__ void initCandidateVids(int *candidate_vids, int size)
 	}
 }
 
-__global__ void neighborsCount(float *x, float *y, float *z, int point_num,
-								int *candidate_vids,
-								int *starting_point_ids, int *point_ids,
-								int *neighbor_count,
-								float threshold, bool search_all)
+__global__ void neighborsCountEdge(float *x, float *y, float *z, int point_num,
+									int *candidate_vids,
+									int *starting_point_ids, int *point_ids,
+									int *neighbor_count,
+									float threshold)
 {
 	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
 		float tx = x[i];
@@ -409,14 +476,8 @@ __global__ void neighborsCount(float *x, float *y, float *z, int point_num,
 				for (int k = pid_start; k < pid_end; k++) {
 					int pid = point_ids[k];
 
-					if (search_all) {
-						if (i != pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
-							count++;
-						}
-					} else {
-						if (i < pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
-							count++;
-						}
+					if (i < pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+						count++;
 					}
 				}
 			}
@@ -428,11 +489,46 @@ __global__ void neighborsCount(float *x, float *y, float *z, int point_num,
 	}
 }
 
-__global__ void neighborsSearch(float *x, float *y, float *z, int point_num,
-									int *candidate_vids,
-									int *starting_point_ids, int *point_ids,
-									int *starting_neighbor_ids, int *neighbor_ids,
-									float threshold, bool search_all)
+__global__ void neighborsCountVertex(float *x, float *y, float *z, int point_num,
+										int *candidate_vids,
+										int *starting_point_ids, int *point_ids,
+										int *neighbor_count,
+										float threshold)
+{
+	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
+		float tx = x[i];
+		float ty = y[i];
+		float tz = z[i];
+		int count = 0;
+
+		for (int candidate_num = 0; candidate_num < 27; candidate_num++) {
+			int vid = candidate_vids[i + candidate_num * point_num];
+
+			if (vid >= 0) {
+				int pid_start = starting_point_ids[vid];
+				int pid_end = starting_point_ids[vid + 1];
+
+				for (int k = pid_start; k < pid_end; k++) {
+					int pid = point_ids[k];
+
+					if (i != pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+						count++;
+					}
+				}
+			}
+		}
+
+		__syncthreads();
+
+		neighbor_count[i] = count;
+	}
+}
+
+__global__ void neighborsSearchVertex(float *x, float *y, float *z, int point_num,
+										int *candidate_vids,
+										int *starting_point_ids, int *point_ids,
+										int *starting_neighbor_ids, int *neighbor_ids,
+										float threshold)
 {
 	for (int i = threadIdx.x + blockIdx.x * blockDim.x; i < point_num; i += blockDim.x * gridDim.x) {
 		float tx = x[i];
@@ -450,14 +546,9 @@ __global__ void neighborsSearch(float *x, float *y, float *z, int point_num,
 				for (int k = pid_start; k < pid_end; k++) {
 					int pid = point_ids[k];
 
-					if (search_all) {
-						if (i != pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
-							neighbor_ids[location++] = pid;
-						}
-					} else {
-						if (i < pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
-							neighbor_ids[location++] = pid;
-						}
+
+					if (i != pid && norm3df(tx - x[pid], ty - y[pid], tz - z[pid]) < threshold) {
+						neighbor_ids[location++] = pid;
 					}
 				}
 			}
@@ -465,7 +556,7 @@ __global__ void neighborsSearch(float *x, float *y, float *z, int point_num,
 	}
 }
 
-void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, int *neighbor_num, float radius, bool search_all)
+void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, int *neighbor_num, float radius)
 {
 #ifdef DEBUG_
 	struct timeval start, end;
@@ -475,7 +566,16 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 
 	int *candidate_vids;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	checkCudaErrors(cudaMalloc(&candidate_vids, sizeof(int) * (point_num_ * 27)));
+
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "Malloc candidateVids = " << timeDiff(start, end) << std::endl;
+#endif
 
 	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
 	grid_x = (point_num_ * 27 - 1) / block_x + 1;
@@ -524,20 +624,30 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 
 	checkCudaErrors(cudaMalloc(starting_neighbor_ids, sizeof(int) * (point_num_ + 1)));
 
-	neighborsCount<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
-											candidate_vids,
-											starting_point_ids_, point_ids_,
-											*starting_neighbor_ids, radius, search_all);
+	neighborsCountVertex<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
+												candidate_vids,
+												starting_point_ids_, point_ids_,
+												*starting_neighbor_ids, radius);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
-
+#ifdef DEBUG_
 	gettimeofday(&end, NULL);
 
 	std::cout << "neighborCount = " << timeDiff(start, end) << std::endl;
+#endif
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 
 	GUtilities::exclusiveScan(*starting_neighbor_ids, point_num_ + 1, neighbor_num);
+
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "exclusiveScan = " << timeDiff(start, end) << std::endl;
+#endif
 
 	if (*neighbor_num == 0) {
 		checkCudaErrors(cudaFree(candidate_vids));
@@ -548,21 +658,37 @@ void GVoxelGrid::radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, i
 		return;
 	}
 
-	checkCudaErrors(cudaMalloc(neighbor_ids, sizeof(int) * (*neighbor_num)));
-
+#ifdef DEBUG_
 	gettimeofday(&start, NULL);
-	neighborsSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
-											candidate_vids,
-											starting_point_ids_, point_ids_,
-											*starting_neighbor_ids,
-											*neighbor_ids,
-											radius, search_all);
+#endif
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
+	checkCudaErrors(cudaMalloc(neighbor_ids, sizeof(int) * (*neighbor_num)));
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+
+	std::cout << "neighborids malloc = " << timeDiff(start, end) << std::endl;
+#endif
+
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
+	neighborsSearchVertex<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
+												candidate_vids,
+												starting_point_ids_, point_ids_,
+												*starting_neighbor_ids,
+												*neighbor_ids,
+												radius);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
 	gettimeofday(&end, NULL);
 
 	std::cout << "neighborrSearches = " << timeDiff(start, end) << std::endl;
+#endif
 
 
 	checkCudaErrors(cudaFree(candidate_vids));
@@ -610,32 +736,49 @@ __global__ void edgeSetBuild(float *x, float *y, float *z, int point_num,
  */
 void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 {
+#ifdef DEBUG_
 	struct timeval start, end;
+#endif
 
 	int block_x, grid_x;
 
 
 	int *candidate_vids;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	checkCudaErrors(cudaMalloc(&candidate_vids, sizeof(int) * (point_num_ * 27)));
+
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+	std::cout << "malloc candidate_vids = " << timeDiff(start, end) << std::endl;
+#endif
+
 
 	block_x = (point_num_ * 27 > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_ * 27;
 	grid_x = (point_num_ * 27 - 1) / block_x + 1;
 
+#ifdef DEBUG_
 	gettimeofday(&start, NULL);
+#endif
 
 	initCandidateVids<<<grid_x, block_x>>>(candidate_vids, point_num_ * 27);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
 	gettimeofday(&end, NULL);
 
 	std::cout << "init candidate vids = " << timeDiff(start, end) << std::endl;
+#endif
 
 	block_x = (point_num_ > BLOCK_SIZE_X) ? BLOCK_SIZE_X : point_num_;
 	grid_x = (point_num_ - 1) / block_x + 1;
 
+#ifdef DEBUG_
 	gettimeofday(&start, NULL);
+#endif
 	boundariesSearch<<<grid_x, block_x>>>(x_, y_, z_, point_num_, radius,
 											vgrid_x_, vgrid_y_, vgrid_z_,
 											voxel_x_, voxel_y_, voxel_z_,
@@ -646,30 +789,43 @@ void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
 	gettimeofday(&end, NULL);
 
 	std::cout << "boundariesSearch = " << timeDiff(start, end) << std::endl;
+#endif
 
 
 	int *starting_neighbor_ids;
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 	checkCudaErrors(cudaMalloc(&starting_neighbor_ids, sizeof(int) * (point_num_ + 1)));
 
-
-	gettimeofday(&start, NULL);
-	neighborsCount<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
-											candidate_vids,
-											starting_point_ids_, point_ids_,
-											starting_neighbor_ids, radius, false);
+	neighborsCountEdge<<<grid_x, block_x>>>(x_, y_, z_, point_num_,
+												candidate_vids,
+												starting_point_ids_, point_ids_,
+												starting_neighbor_ids, radius);
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
 	gettimeofday(&end, NULL);
 
 	std::cout << "NeighborCount = " << timeDiff(start, end) << std::endl;
+#endif
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
 
 	GUtilities::exclusiveScan(starting_neighbor_ids, point_num_ + 1, edge_num);
+
+#ifdef DEBUG_
+	gettimeofday(&end, NULL);
+	std::cout << "exclusiveScan = " << timeDiff(start, end) << std::endl;
+#endif
 
 	if (*edge_num == 0) {
 		checkCudaErrors(cudaFree(candidate_vids));
@@ -679,9 +835,12 @@ void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 		return;
 	}
 
+#ifdef DEBUG_
+	gettimeofday(&start, NULL);
+#endif
+
 	checkCudaErrors(cudaMalloc(edge_set, sizeof(int2) * (*edge_num)));
 
-	gettimeofday(&start, NULL);
 	edgeSetBuild<<<grid_x, block_x>>>(x_, y_, z_, point_num_, candidate_vids,
 										starting_point_ids_, point_ids_,
 										starting_neighbor_ids, *edge_set,
@@ -689,9 +848,11 @@ void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 	checkCudaErrors(cudaGetLastError());
 	checkCudaErrors(cudaDeviceSynchronize());
 
+#ifdef DEBUG_
 	gettimeofday(&end, NULL);
 
 	std::cout << "edgeSetBuild = " << timeDiff(start, end) << std::endl;
+#endif
 
 
 	checkCudaErrors(cudaFree(candidate_vids));
@@ -700,7 +861,7 @@ void GVoxelGrid::createEdgeSet(int2 **edge_set, int *edge_num, float radius)
 
 void GVoxelGrid::createAdjacentList(int **starting_neighbor_ids, int **adjacent_list, int *list_size, float radius)
 {
-	radiusSearch(starting_neighbor_ids, adjacent_list, list_size, radius, true);
+	radiusSearch(starting_neighbor_ids, adjacent_list, list_size, radius);
 }
 
 __global__ void matrixBuild(float *x, float *y, float *z, int point_num,
@@ -847,9 +1008,19 @@ void GVoxelGrid::createLabeledMatrix(int *point_labels, int label_num, int **mat
 
 GVoxelGrid::~GVoxelGrid()
 {
-	checkCudaErrors(cudaFree(voxel_ids_));
-	checkCudaErrors(cudaFree(starting_point_ids_));
-	checkCudaErrors(cudaFree(point_ids_));
+	if (voxel_ids_ != NULL) {
+		checkCudaErrors(cudaFree(voxel_ids_));
+	}
+
+	if (starting_point_ids_ != NULL) {
+		checkCudaErrors(cudaFree(starting_point_ids_));
+	}
+
+	if (point_ids_ != NULL) {
+		checkCudaErrors(cudaFree(point_ids_));
+	}
+
+	voxel_ids_ = starting_point_ids_ = point_ids_ = NULL;
 
 	x_ = y_ = z_ = NULL;
 }

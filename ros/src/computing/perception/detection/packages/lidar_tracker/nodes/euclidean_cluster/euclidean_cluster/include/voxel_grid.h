@@ -19,7 +19,7 @@ public:
 	 * If search_all = false, only search for neighbors whose indexes is larger than pid.
 	 * By default, search_all = false.
 	 */
-	void radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, int *neighbor_num, float radius, bool search_all = false);
+	void radiusSearch(int **starting_neighbor_ids, int **neighbor_ids, int *neighbor_num, float radius);
 
 	/* Produce a graph in the form of an edge set from the cloud.
 	 * Each vertex is a point.
@@ -62,5 +62,7 @@ private:
 	int *starting_point_ids_;
 	int *point_ids_;
 };
+
+//#define DEBUG_ 1
 
 #endif
