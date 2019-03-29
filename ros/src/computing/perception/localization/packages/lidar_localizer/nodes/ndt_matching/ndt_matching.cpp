@@ -99,6 +99,8 @@ enum class MethodType
 };
 static MethodType _method_type = MethodType::PCL_GENERIC;
 
+// previous_pose：通过/config_ndt、/initialpose、/gnss_pose来更新
+// current_pose_imu：通过/initialpose更新，imu_calc()、/gnss_pose来更新
 static pose initial_pose, predict_pose, predict_pose_imu, predict_pose_odom, predict_pose_imu_odom, previous_pose,
     ndt_pose, current_pose, current_pose_imu, current_pose_odom, current_pose_imu_odom, localizer_pose;
 
@@ -995,11 +997,11 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     predict_pose.yaw = previous_pose.yaw + offset_yaw;
 
     if (_use_imu == true && _use_odom == true)
-      imu_odom_calc(current_scan_time);
+      imu_odom_calc(current_scan_time);			// 计算得到predict_pose_imu_odom
     if (_use_imu == true && _use_odom == false)
-      imu_calc(current_scan_time);
+      imu_calc(current_scan_time);				// 计算得到predict_pose_imu
     if (_use_imu == false && _use_odom == true)
-      odom_calc(current_scan_time);
+      odom_calc(current_scan_time);				// 计算得到predict_pose_odom
 
     pose predict_pose_for_ndt;
     if (_use_imu == true && _use_odom == true)
@@ -1011,6 +1013,13 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     else
       predict_pose_for_ndt = predict_pose;
 
+	/*
+	旋转矩阵（3X3）:Eigen::Matrix3d
+	旋转向量（3X1）:Eigen::AngleAxisd
+	四元数（4X1）:Eigen::Quaterniond
+	平移向量（3X1）:Eigen::Vector3d
+	变换矩阵（4X4）:Eigen::Isometry3d
+	*/
     Eigen::Translation3f init_translation(predict_pose_for_ndt.x, predict_pose_for_ndt.y, predict_pose_for_ndt.z);
     Eigen::AngleAxisf init_rotation_x(predict_pose_for_ndt.roll, Eigen::Vector3f::UnitX());
     Eigen::AngleAxisf init_rotation_y(predict_pose_for_ndt.pitch, Eigen::Vector3f::UnitY());
@@ -1022,19 +1031,19 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     if (_method_type == MethodType::PCL_GENERIC)
     {
       align_start = std::chrono::system_clock::now();
-      ndt.align(*output_cloud, init_guess);
+      ndt.align(*output_cloud, init_guess);		// 计算需要的刚体变换以便将输入的源点云匹配到目标点云
       align_end = std::chrono::system_clock::now();
 
       has_converged = ndt.hasConverged();
 
-      t = ndt.getFinalTransformation();
-      iteration = ndt.getFinalNumIteration();
+      t = ndt.getFinalTransformation();			//t 是 base_link旋转矩阵？
+      iteration = ndt.getFinalNumIteration();	// 迭代次数
 
       getFitnessScore_start = std::chrono::system_clock::now();
-      fitness_score = ndt.getFitnessScore();
+      fitness_score = ndt.getFitnessScore();	// 配准得分
       getFitnessScore_end = std::chrono::system_clock::now();
 
-      trans_probability = ndt.getTransformationProbability();
+      trans_probability = ndt.getTransformationProbability();   // 获得配准可能性？!
     }
     else if (_method_type == MethodType::PCL_ANH)
     {
@@ -1091,9 +1100,9 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
       trans_probability = omp_ndt.getTransformationProbability();
     }
 #endif
-    align_time = std::chrono::duration_cast<std::chrono::microseconds>(align_end - align_start).count() / 1000.0;
+    align_time = std::chrono::duration_cast<std::chrono::microseconds>(align_end - align_start).count() / 1000.0;	// 计算align和fit的用时
 
-    t2 = t * tf_btol.inverse();
+    t2 = t * tf_btol.inverse();   // t-baselink to t2-localizer
 
     getFitnessScore_time =
         std::chrono::duration_cast<std::chrono::microseconds>(getFitnessScore_end - getFitnessScore_start).count() /
@@ -1124,7 +1133,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     mat_b.getRPY(ndt_pose.roll, ndt_pose.pitch, ndt_pose.yaw, 1);
 
     // Calculate the difference between ndt_pose and predict_pose
-    predict_pose_error = sqrt((ndt_pose.x - predict_pose_for_ndt.x) * (ndt_pose.x - predict_pose_for_ndt.x) +
+    predict_pose_error = sqrt((ndt_pose.x - predict_pose_for_ndt.x) * (ndt_pose.x - predict_pose_for_ndt.x) +	//predict_pose_for_ndt根据时间间隔计算出来的
                               (ndt_pose.y - predict_pose_for_ndt.y) * (ndt_pose.y - predict_pose_for_ndt.y) +
                               (ndt_pose.z - predict_pose_for_ndt.z) * (ndt_pose.z - predict_pose_for_ndt.z));
 
@@ -1136,9 +1145,9 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     {
       use_predict_pose = 1;
     }
-    use_predict_pose = 0;
+    use_predict_pose = 0;	//？？？什么情况
 
-    if (use_predict_pose == 0)
+    if (use_predict_pose == 0) // 上一句导致这个分支永不执行
     {
       current_pose.x = ndt_pose.x;
       current_pose.y = ndt_pose.y;
@@ -1161,19 +1170,19 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     diff_x = current_pose.x - previous_pose.x;
     diff_y = current_pose.y - previous_pose.y;
     diff_z = current_pose.z - previous_pose.z;
-    diff_yaw = calcDiffForRadian(current_pose.yaw, previous_pose.yaw);
-    diff = sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
+    diff_yaw = calcDiffForRadian(current_pose.yaw, previous_pose.yaw);	// 计算夹角，弧度表示
+    diff = sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);  // 计算预测点与上一个点的距离
 
-    const pose trans_current_pose = convertPoseIntoRelativeCoordinate(current_pose, previous_pose);
+    const pose trans_current_pose = convertPoseIntoRelativeCoordinate(current_pose, previous_pose);	// 转换到相对坐标系？
 
     current_velocity = (diff_time > 0) ? (diff / diff_time) : 0;
-    current_velocity =  (trans_current_pose.x >= 0) ? current_velocity : -current_velocity;
+    current_velocity =  (trans_current_pose.x >= 0) ? current_velocity : -current_velocity;		// 计算各个坐标轴分量的速度以及角速度
     current_velocity_x = (diff_time > 0) ? (diff_x / diff_time) : 0;
     current_velocity_y = (diff_time > 0) ? (diff_y / diff_time) : 0;
     current_velocity_z = (diff_time > 0) ? (diff_z / diff_time) : 0;
     angular_velocity = (diff_time > 0) ? (diff_yaw / diff_time) : 0;
 
-    current_pose_imu.x = current_pose.x;
+    current_pose_imu.x = current_pose.x;		// current_pose更新到各代表传感器姿态的pose参数
     current_pose_imu.y = current_pose.y;
     current_pose_imu.z = current_pose.z;
     current_pose_imu.roll = current_pose.roll;
@@ -1198,21 +1207,21 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     current_pose_imu_odom.pitch = current_pose.pitch;
     current_pose_imu_odom.yaw = current_pose.yaw;
 
-    current_velocity_smooth = (current_velocity + previous_velocity + previous_previous_velocity) / 3.0;
+    current_velocity_smooth = (current_velocity + previous_velocity + previous_previous_velocity) / 3.0;	// 速度的平滑处理，对最近3次的速度取均值
     if (std::fabs(current_velocity_smooth) < 0.2)
     {
       current_velocity_smooth = 0.0;
     }
 
-    current_accel = (diff_time > 0) ? ((current_velocity - previous_velocity) / diff_time) : 0;
+    current_accel = (diff_time > 0) ? ((current_velocity - previous_velocity) / diff_time) : 0;       // 计算各个加速度
     current_accel_x = (diff_time > 0) ? ((current_velocity_x - previous_velocity_x) / diff_time) : 0;
     current_accel_y = (diff_time > 0) ? ((current_velocity_y - previous_velocity_y) / diff_time) : 0;
     current_accel_z = (diff_time > 0) ? ((current_velocity_z - previous_velocity_z) / diff_time) : 0;
 
-    estimated_vel_mps.data = current_velocity;
-    estimated_vel_kmph.data = current_velocity * 3.6;
+    estimated_vel_mps.data = current_velocity;			//m/s的速度估计
+    estimated_vel_kmph.data = current_velocity * 3.6;	//km/h的速度表示
 
-    estimated_vel_mps_pub.publish(estimated_vel_mps);
+    estimated_vel_mps_pub.publish(estimated_vel_mps);	// 发布速度
     estimated_vel_kmph_pub.publish(estimated_vel_kmph);
 
     // Set values for publishing pose
@@ -1244,6 +1253,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
       predict_pose_msg.pose.orientation.w = predict_q.w();
     }
 
+    // 把自定义的pose类型数据（包括xyzrpy），转成标准的geometry_msgs::PoseStamped数据
     tf::Quaternion predict_q_imu;
     predict_q_imu.setRPY(predict_pose_imu.roll, predict_pose_imu.pitch, predict_pose_imu.yaw);
     predict_pose_imu_msg.header.frame_id = "map";
@@ -1284,7 +1294,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     predict_pose_imu_odom_pub.publish(predict_pose_imu_odom_msg);
 
     ndt_q.setRPY(ndt_pose.roll, ndt_pose.pitch, ndt_pose.yaw);
-    if (_use_local_transform == true)
+    if (_use_local_transform == true)     // 多了个变换，后面再看
     {
       tf::Vector3 v(ndt_pose.x, ndt_pose.y, ndt_pose.z);
       tf::Transform transform(ndt_q, v);
@@ -1360,6 +1370,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     //    current_pose_pub.publish(current_pose_msg);
     localizer_pose_pub.publish(localizer_pose_msg);
 
+    // 发布变换规则？ /map和/base_link之间
     // Send TF "/base_link" to "/map"
     transform.setOrigin(tf::Vector3(current_pose.x, current_pose.y, current_pose.z));
     transform.setRotation(current_q);
@@ -1374,15 +1385,16 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     }
 
     matching_end = std::chrono::system_clock::now();
-    exe_time = std::chrono::duration_cast<std::chrono::microseconds>(matching_end - matching_start).count() / 1000.0;
+    exe_time = std::chrono::duration_cast<std::chrono::microseconds>(matching_end - matching_start).count() / 1000.0;   // 计算匹配运算时长，单位：秒
     time_ndt_matching.data = exe_time;
     node_status_publisher_ptr_->CHECK_MAX_VALUE("/value/time_ndt_matching",time_ndt_matching.data,50,70,100,"value time_ndt_matching is too high.");
     time_ndt_matching_pub.publish(time_ndt_matching);
 
+    // 发布当前速度
     // Set values for /estimate_twist
     estimate_twist_msg.header.stamp = current_scan_time;
     estimate_twist_msg.header.frame_id = "/base_link";
-    estimate_twist_msg.twist.linear.x = current_velocity;
+    estimate_twist_msg.twist.linear.x = current_velocity;   // current_velocity是根据当前位置和前一个位置的diff除以两次scan的时间间隔得到的，为啥是这么计算，需要研究
     estimate_twist_msg.twist.linear.y = 0.0;
     estimate_twist_msg.twist.linear.z = 0.0;
     estimate_twist_msg.twist.angular.x = 0.0;
@@ -1398,17 +1410,18 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     node_status_publisher_ptr_->CHECK_MAX_VALUE("/value/estimate_twist/angular",angular_velocity,5,10,15,"value linear angular twist is too high.");
     estimated_vel_pub.publish(estimate_vel_msg);
 
+    // 发布/ndt_stat数据
     // Set values for /ndt_stat
-    ndt_stat_msg.header.stamp = current_scan_time;
-    ndt_stat_msg.exe_time = time_ndt_matching.data;
-    ndt_stat_msg.iteration = iteration;
-    ndt_stat_msg.score = fitness_score;
-    ndt_stat_msg.velocity = current_velocity;
-    ndt_stat_msg.acceleration = current_accel;
+    ndt_stat_msg.header.stamp = current_scan_time;    // 当前扫描时间
+    ndt_stat_msg.exe_time = time_ndt_matching.data;   // 匹配运算用时，单位：秒
+    ndt_stat_msg.iteration = iteration;               // 迭代次数
+    ndt_stat_msg.score = fitness_score;               // 配准得分
+    ndt_stat_msg.velocity = current_velocity;         // 当前速度
+    ndt_stat_msg.acceleration = current_accel;        // 加速度
     ndt_stat_msg.use_predict_pose = 0;
 
     ndt_stat_pub.publish(ndt_stat_msg);
-    /* Compute NDT_Reliability */
+    /* Compute NDT_Reliability */                     // 按照wa,wb,wc计算变换的可信度。
     ndt_reliability.data = Wa * (exe_time / 100.0) * 100.0 + Wb * (iteration / 10.0) * 100.0 +
                            Wc * ((2.0 - trans_probability) / 2.0) * 100.0;
     ndt_reliability_pub.publish(ndt_reliability);
@@ -1458,6 +1471,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     std::cout << "Get fitness score time: " << getFitnessScore_time << std::endl;
     std::cout << "-----------------------------------------------------------------" << std::endl;
 
+    // ------------------------把当前数据更新到previous中--------------------------
     offset_imu_x = 0.0;
     offset_imu_y = 0.0;
     offset_imu_z = 0.0;
@@ -1632,7 +1646,7 @@ int main(int argc, char** argv)
   Eigen::AngleAxisf rot_x_btol(_tf_roll, Eigen::Vector3f::UnitX());  // rot: rotation
   Eigen::AngleAxisf rot_y_btol(_tf_pitch, Eigen::Vector3f::UnitY());
   Eigen::AngleAxisf rot_z_btol(_tf_yaw, Eigen::Vector3f::UnitZ());
-  tf_btol = (tl_btol * rot_z_btol * rot_y_btol * rot_x_btol).matrix();
+  tf_btol = (tl_btol * rot_z_btol * rot_y_btol * rot_x_btol).matrix();	// base_link与localizer之间的tf变换
 
   // Updated in initialpose_callback or gnss_callback
   initial_pose.x = 0.0;
@@ -1654,8 +1668,8 @@ int main(int argc, char** argv)
   estimated_vel_mps_pub = nh.advertise<std_msgs::Float32>("/estimated_vel_mps", 10);
   estimated_vel_kmph_pub = nh.advertise<std_msgs::Float32>("/estimated_vel_kmph", 10);
   estimated_vel_pub = nh.advertise<geometry_msgs::Vector3Stamped>("/estimated_vel", 10);
-  time_ndt_matching_pub = nh.advertise<std_msgs::Float32>("/time_ndt_matching", 10);
-  ndt_stat_pub = nh.advertise<autoware_msgs::NDTStat>("/ndt_stat", 10);
+  time_ndt_matching_pub = nh.advertise<std_msgs::Float32>("/time_ndt_matching", 10);      // 配准运算用时
+  ndt_stat_pub = nh.advertise<autoware_msgs::NDTStat>("/ndt_stat", 10);                   // 包括配准用时、迭代次数、配准得分、速度、加速度等其它信息
   ndt_reliability_pub = nh.advertise<std_msgs::Float32>("/ndt_reliability", 10);
 
   // Subscribers
