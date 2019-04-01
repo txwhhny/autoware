@@ -311,7 +311,7 @@ static void param_callback(const autoware_config_msgs::ConfigNDT::ConstPtr& inpu
 #endif
 #ifdef USE_PCL_OPENMP
     else if (_method_type == MethodType::PCL_OPENMP)
-      omp_ndt.setStepSize(ndt_res);
+      omp_ndt.setStepSize(ndt_res);             // 小立方格子分辨率，同时也作为优化步长，阈值和迭代次数？
 #endif
   }
 
@@ -433,15 +433,15 @@ static void map_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     points_map_num = input->width;
 
     // Convert the data type(from sensor_msgs to pcl).
-    pcl::fromROSMsg(*input, map);
+    pcl::fromROSMsg(*input, map);   // map-pcl的点云类型 pcl::PointCloud<pcl::PointXYZ>
 
-    if (_use_local_transform == true)
+    if (_use_local_transform == true)   // 从配置文件中读取_use_local_transform
     {
       tf::TransformListener local_transform_listener;
       try
       {
         ros::Time now = ros::Time(0);
-        local_transform_listener.waitForTransform("/map", "/world", now, ros::Duration(10.0));
+        local_transform_listener.waitForTransform("/map", "/world", now, ros::Duration(10.0));  // "/world" -> "/map"
         local_transform_listener.lookupTransform("/map", "world", now, local_transform);
       }
       catch (tf::TransformException& ex)
@@ -449,7 +449,7 @@ static void map_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
         ROS_ERROR("%s", ex.what());
       }
 
-      pcl_ros::transformPointCloud(map, map, local_transform.inverse());
+      pcl_ros::transformPointCloud(map, map, local_transform.inverse());  // 把"world"坐标下的点变换成"/map"坐标下的点
     }
 
     pcl::PointCloud<pcl::PointXYZ>::Ptr map_ptr(new pcl::PointCloud<pcl::PointXYZ>(map));
@@ -457,15 +457,15 @@ static void map_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     // Setting point cloud to be aligned to.
     if (_method_type == MethodType::PCL_GENERIC)
     {
-      pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> new_ndt;
+      pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> new_ndt;  // 创建一个ndt对象
       pcl::PointCloud<pcl::PointXYZ>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-      new_ndt.setResolution(ndt_res);
-      new_ndt.setInputTarget(map_ptr);
-      new_ndt.setMaximumIterations(max_iter);
-      new_ndt.setStepSize(step_size);
-      new_ndt.setTransformationEpsilon(trans_eps);
+      new_ndt.setResolution(ndt_res);                   // 设置网格化时立方体的边长           
+      new_ndt.setInputTarget(map_ptr);                  // 输入"/map"下的点云，也就是高精地图点云
+      new_ndt.setMaximumIterations(max_iter);           // 设置最大迭代次数,即当到达最大迭代次数或收敛到阈值，停止优化
+      new_ndt.setStepSize(step_size);                   // 设置牛顿法优化的最大步长
+      new_ndt.setTransformationEpsilon(trans_eps);      // 两个连续变换之间允许的最大差值，这是判断我们的优化过程是否已经收敛到最终解的阈值
 
-      new_ndt.align(*output_cloud, Eigen::Matrix4f::Identity());
+      new_ndt.align(*output_cloud, Eigen::Matrix4f::Identity());  // 匹配
 
       pthread_mutex_lock(&mutex);
       ndt = new_ndt;
@@ -1036,7 +1036,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
 
       has_converged = ndt.hasConverged();
 
-      t = ndt.getFinalTransformation();			//t 是 base_link旋转矩阵？
+      t = ndt.getFinalTransformation();			// 获取最最终的变换参数，t 是 base_link旋转矩阵？
       iteration = ndt.getFinalNumIteration();	// 迭代次数
 
       getFitnessScore_start = std::chrono::system_clock::now();
@@ -1170,7 +1170,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     diff_x = current_pose.x - previous_pose.x;
     diff_y = current_pose.y - previous_pose.y;
     diff_z = current_pose.z - previous_pose.z;
-    diff_yaw = calcDiffForRadian(current_pose.yaw, previous_pose.yaw);	// 计算夹角，弧度表示
+    diff_yaw = calcDiffForRadian(current_pose.yaw, previous_pose.yaw);	// 计算当前位置和前一个位置偏航的夹角，弧度表示
     diff = sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);  // 计算预测点与上一个点的距离
 
     const pose trans_current_pose = convertPoseIntoRelativeCoordinate(current_pose, previous_pose);	// 转换到相对坐标系？
