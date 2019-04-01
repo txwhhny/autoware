@@ -435,7 +435,7 @@ static void map_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     // Convert the data type(from sensor_msgs to pcl).
     pcl::fromROSMsg(*input, map);   // map-pcl的点云类型 pcl::PointCloud<pcl::PointXYZ>
 
-    if (_use_local_transform == true)   // 从配置文件中读取_use_local_transform
+    if (_use_local_transform == true)   // 从配置文件中读取_use_local_transform,决定是否进行local_transform
     {
       tf::TransformListener local_transform_listener;
       try
