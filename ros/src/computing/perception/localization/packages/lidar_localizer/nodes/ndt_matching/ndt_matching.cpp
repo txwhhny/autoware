@@ -465,7 +465,7 @@ static void map_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
       new_ndt.setStepSize(step_size);                   // 设置牛顿法优化的最大步长
       new_ndt.setTransformationEpsilon(trans_eps);      // 两个连续变换之间允许的最大差值，这是判断我们的优化过程是否已经收敛到最终解的阈值
 
-      new_ndt.align(*output_cloud, Eigen::Matrix4f::Identity());  // 匹配
+      new_ndt.align(*output_cloud, Eigen::Matrix4f::Identity());  // 匹配？单位矩阵？
 
       pthread_mutex_lock(&mutex);
       ndt = new_ndt;
@@ -703,12 +703,13 @@ static void initialpose_callback(const geometry_msgs::PoseWithCovarianceStamped:
   init_pos_set = 1;
 }
 
-static void imu_odom_calc(ros::Time current_time)
+// 只在points_callback中调用
+static void imu_odom_calc(ros::Time current_time)     // 结合imu和里程计，计算在两次points_callback调用之间的x、y、z以及角度增量
 {
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
 
-  double diff_imu_roll = imu.angular_velocity.x * diff_time;
+  double diff_imu_roll = imu.angular_velocity.x * diff_time;  // 角速度 × 时间
   double diff_imu_pitch = imu.angular_velocity.y * diff_time;
   double diff_imu_yaw = imu.angular_velocity.z * diff_time;
 
@@ -717,7 +718,7 @@ static void imu_odom_calc(ros::Time current_time)
   current_pose_imu_odom.yaw += diff_imu_yaw;
 
   double diff_distance = odom.twist.twist.linear.x * diff_time;
-  offset_imu_odom_x += diff_distance * cos(-current_pose_imu_odom.pitch) * cos(current_pose_imu_odom.yaw);
+  offset_imu_odom_x += diff_distance * cos(-current_pose_imu_odom.pitch) * cos(current_pose_imu_odom.yaw);  // 行走距离 × cos(pitch)× cos(yaw)即x分量
   offset_imu_odom_y += diff_distance * cos(-current_pose_imu_odom.pitch) * sin(current_pose_imu_odom.yaw);
   offset_imu_odom_z += diff_distance * sin(-current_pose_imu_odom.pitch);
 
@@ -725,7 +726,7 @@ static void imu_odom_calc(ros::Time current_time)
   offset_imu_odom_pitch += diff_imu_pitch;
   offset_imu_odom_yaw += diff_imu_yaw;
 
-  predict_pose_imu_odom.x = previous_pose.x + offset_imu_odom_x;
+  predict_pose_imu_odom.x = previous_pose.x + offset_imu_odom_x;              // 各个offset在points_callback函数尾部清零
   predict_pose_imu_odom.y = previous_pose.y + offset_imu_odom_y;
   predict_pose_imu_odom.z = previous_pose.z + offset_imu_odom_z;
   predict_pose_imu_odom.roll = previous_pose.roll + offset_imu_odom_roll;
@@ -735,12 +736,13 @@ static void imu_odom_calc(ros::Time current_time)
   previous_time = current_time;
 }
 
-static void odom_calc(ros::Time current_time)
+// 在points_callback和odom_callback中调用
+static void odom_calc(ros::Time current_time)                               // 增量数据offset_xxxxx同样在points_callback函数尾部清零
 {
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
 
-  double diff_odom_roll = odom.twist.twist.angular.x * diff_time;
+  double diff_odom_roll = odom.twist.twist.angular.x * diff_time;           // 根据时间计算角度增量
   double diff_odom_pitch = odom.twist.twist.angular.y * diff_time;
   double diff_odom_yaw = odom.twist.twist.angular.z * diff_time;
 
@@ -767,12 +769,13 @@ static void odom_calc(ros::Time current_time)
   previous_time = current_time;
 }
 
-static void imu_calc(ros::Time current_time)
+// 在points_callback和imu_callback中调用
+static void imu_calc(ros::Time current_time)    // 增量数据offset_xxxxx，同样在points_callback函数尾部清零
 {
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
 
-  double diff_imu_roll = imu.angular_velocity.x * diff_time;
+  double diff_imu_roll = imu.angular_velocity.x * diff_time;    // 角度增量
   double diff_imu_pitch = imu.angular_velocity.y * diff_time;
   double diff_imu_yaw = imu.angular_velocity.z * diff_time;
 
@@ -780,7 +783,7 @@ static void imu_calc(ros::Time current_time)
   current_pose_imu.pitch += diff_imu_pitch;
   current_pose_imu.yaw += diff_imu_yaw;
 
-  double accX1 = imu.linear_acceleration.x;
+  double accX1 = imu.linear_acceleration.x;                     // 分别在按照roll、pitch、yaw等角度计算x、y、z的加速度分量
   double accY1 = std::cos(current_pose_imu.roll) * imu.linear_acceleration.y -
                  std::sin(current_pose_imu.roll) * imu.linear_acceleration.z;
   double accZ1 = std::sin(current_pose_imu.roll) * imu.linear_acceleration.y +
@@ -794,19 +797,19 @@ static void imu_calc(ros::Time current_time)
   double accY = std::sin(current_pose_imu.yaw) * accX2 + std::cos(current_pose_imu.yaw) * accY2;
   double accZ = accZ2;
 
-  offset_imu_x += current_velocity_imu_x * diff_time + accX * diff_time * diff_time / 2.0;
+  offset_imu_x += current_velocity_imu_x * diff_time + accX * diff_time * diff_time / 2.0;    // 计算位移增量
   offset_imu_y += current_velocity_imu_y * diff_time + accY * diff_time * diff_time / 2.0;
   offset_imu_z += current_velocity_imu_z * diff_time + accZ * diff_time * diff_time / 2.0;
 
-  current_velocity_imu_x += accX * diff_time;
+  current_velocity_imu_x += accX * diff_time;   // 计算当前各个方向的速度
   current_velocity_imu_y += accY * diff_time;
   current_velocity_imu_z += accZ * diff_time;
 
-  offset_imu_roll += diff_imu_roll;
+  offset_imu_roll += diff_imu_roll;             // 计算角度增量
   offset_imu_pitch += diff_imu_pitch;
   offset_imu_yaw += diff_imu_yaw;
 
-  predict_pose_imu.x = previous_pose.x + offset_imu_x;
+  predict_pose_imu.x = previous_pose.x + offset_imu_x;      // 生成预测点
   predict_pose_imu.y = previous_pose.y + offset_imu_y;
   predict_pose_imu.z = previous_pose.z + offset_imu_z;
   predict_pose_imu.roll = previous_pose.roll + offset_imu_roll;
@@ -848,6 +851,7 @@ static void odom_callback(const nav_msgs::Odometry::ConstPtr& input)
   odom_calc(input->header.stamp);
 }
 
+// 如果imu颠倒了，各个参数*-1
 static void imuUpsideDown(const sensor_msgs::Imu::Ptr input)
 {
   double input_roll, input_pitch, input_yaw;
@@ -887,12 +891,12 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
   tf::quaternionMsgToTF(input->orientation, imu_orientation);
   tf::Matrix3x3(imu_orientation).getRPY(imu_roll, imu_pitch, imu_yaw);
 
-  imu_roll = wrapToPmPi(imu_roll);
+  imu_roll = wrapToPmPi(imu_roll);    // 转成从-pi到pi之间的弧度
   imu_pitch = wrapToPmPi(imu_pitch);
   imu_yaw = wrapToPmPi(imu_yaw);
 
   static double previous_imu_roll = imu_roll, previous_imu_pitch = imu_pitch, previous_imu_yaw = imu_yaw;
-  const double diff_imu_roll = calcDiffForRadian(imu_roll, previous_imu_roll);
+  const double diff_imu_roll = calcDiffForRadian(imu_roll, previous_imu_roll);    // imu_roll - previous_imu_roll，同时处理成-pi到pi之间的弧度值
   const double diff_imu_pitch = calcDiffForRadian(imu_pitch, previous_imu_pitch);
   const double diff_imu_yaw = calcDiffForRadian(imu_yaw, previous_imu_yaw);
 
@@ -924,7 +928,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
   previous_imu_yaw = imu_yaw;
 }
 
-static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
+static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)    // 话题"/filtered_points"的回调，待匹配点云数据
 {
   node_status_publisher_ptr_->CHECK_RATE("/topic/rate/points_raw/slow",8,5,1,"topic points_raw subscribe rate low.");
   if (map_loaded == 1 && init_pos_set == 1)
@@ -952,7 +956,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
         getFitnessScore_end;
     static double align_time, getFitnessScore_time = 0.0;
 
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex);                     // 为了保护ndt、anh_ndt...
 
     if (_method_type == MethodType::PCL_GENERIC)
       ndt.setInputSource(filtered_scan_ptr);
@@ -999,6 +1003,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
     predict_pose.pitch = previous_pose.pitch;
     predict_pose.yaw = previous_pose.yaw + offset_yaw;
 
+    // 根据imu和odom的启用情况，决定采用那个数据作为位置信息的预测
     if (_use_imu == true && _use_odom == true)
       imu_odom_calc(current_scan_time);			// 计算得到predict_pose_imu_odom
     if (_use_imu == true && _use_odom == false)
