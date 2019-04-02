@@ -351,7 +351,7 @@ static void param_callback(const autoware_config_msgs::ConfigNDT::ConstPtr& inpu
 #endif
   }
 
-  if (_use_gnss == 0 && init_pos_set == 0)
+  if (_use_gnss == 0 && init_pos_set == 0)          // 不使用gnss位置，以参数的指定位置作为初始位置
   {
     initial_pose.x = input->x;
     initial_pose.y = input->y;
@@ -381,7 +381,7 @@ static void param_callback(const autoware_config_msgs::ConfigNDT::ConstPtr& inpu
       std::cout << "initial_pose.yaw: " << initial_pose.yaw << std::endl;
     }
 
-    // Setting position and posture for the first time.
+    // Setting position and posture for the first time.   
     localizer_pose.x = initial_pose.x;
     localizer_pose.y = initial_pose.y;
     localizer_pose.z = initial_pose.z;
@@ -409,7 +409,7 @@ static void param_callback(const autoware_config_msgs::ConfigNDT::ConstPtr& inpu
     current_velocity_z = 0;
     angular_velocity = 0;
 
-    current_pose_imu.x = 0;
+    current_pose_imu.x = 0;           // 这里为什么都是0？？？
     current_pose_imu.y = 0;
     current_pose_imu.z = 0;
     current_pose_imu.roll = 0;
@@ -538,6 +538,7 @@ static void map_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
 
 static void gnss_callback(const geometry_msgs::PoseStamped::ConstPtr& input)
 {
+  // 把PoseStamped格式的gnss数据转成自定义的pose数据类型。
   tf::Quaternion gnss_q(input->pose.orientation.x, input->pose.orientation.y, input->pose.orientation.z,
                         input->pose.orientation.w);
   tf::Matrix3x3 gnss_m(gnss_q);
@@ -552,35 +553,36 @@ static void gnss_callback(const geometry_msgs::PoseStamped::ConstPtr& input)
   ros::Time current_gnss_time = input->header.stamp;
   static ros::Time previous_gnss_time = current_gnss_time;
 
-  if ((_use_gnss == 1 && init_pos_set == 0) || fitness_score >= 500.0)
+  if ((_use_gnss == 1 && init_pos_set == 0) || fitness_score >= 500.0)  // 如果没设置初始位置，或score超过500
   {
-    previous_pose.x = previous_gnss_pose.x;
+    previous_pose.x = previous_gnss_pose.x;         // 把previous_gnss_pose作为previous_pose位置
     previous_pose.y = previous_gnss_pose.y;
     previous_pose.z = previous_gnss_pose.z;
     previous_pose.roll = previous_gnss_pose.roll;
     previous_pose.pitch = previous_gnss_pose.pitch;
     previous_pose.yaw = previous_gnss_pose.yaw;
 
-    current_pose.x = current_gnss_pose.x;
+    current_pose.x = current_gnss_pose.x;           // 把current_gnss_pose作为_current_pose
     current_pose.y = current_gnss_pose.y;
     current_pose.z = current_gnss_pose.z;
     current_pose.roll = current_gnss_pose.roll;
     current_pose.pitch = current_gnss_pose.pitch;
     current_pose.yaw = current_gnss_pose.yaw;
 
-    current_pose_imu = current_pose_odom = current_pose_imu_odom = current_pose;
+    current_pose_imu = current_pose_odom = current_pose_imu_odom = current_pose;  // 重新设置各个传感器保存的位置数据
 
+    // 以下是求速度信息
     diff_x = current_pose.x - previous_pose.x;
     diff_y = current_pose.y - previous_pose.y;
     diff_z = current_pose.z - previous_pose.z;
     diff_yaw = current_pose.yaw - previous_pose.yaw;
-    diff = sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
+    diff = sqrt(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);   // 求得当前位置与前一个位置的直线距离
 
-    const pose trans_current_pose = convertPoseIntoRelativeCoordinate(current_pose, previous_pose);
+    const pose trans_current_pose = convertPoseIntoRelativeCoordinate(current_pose, previous_pose);   // 不太懂
 
-    const double diff_time = (current_gnss_time - previous_gnss_time).toSec();
+    const double diff_time = (current_gnss_time - previous_gnss_time).toSec();  // 根据两帧数据的时间间隔，计算合速度以及各个分速度
     current_velocity = (diff_time > 0) ? (diff / diff_time) : 0;
-    current_velocity =  (trans_current_pose.x >= 0) ? current_velocity : -current_velocity;
+    current_velocity =  (trans_current_pose.x >= 0) ? current_velocity : -current_velocity;   // 速度反向？！
     current_velocity_x = (diff_time > 0) ? (diff_x / diff_time) : 0;
     current_velocity_y = (diff_time > 0) ? (diff_y / diff_time) : 0;
     current_velocity_z = (diff_time > 0) ? (diff_z / diff_time) : 0;
@@ -591,9 +593,10 @@ static void gnss_callback(const geometry_msgs::PoseStamped::ConstPtr& input)
     current_accel_y = 0.0;
     current_accel_z = 0.0;
 
-    init_pos_set = 1;
+    init_pos_set = 1;   // 标记已经初始位置已经设置了。
   }
 
+  // 始终把previous_gnss_pose更新为current_gnss_pose
   previous_gnss_pose.x = current_gnss_pose.x;
   previous_gnss_pose.y = current_gnss_pose.y;
   previous_gnss_pose.z = current_gnss_pose.z;
@@ -603,10 +606,10 @@ static void gnss_callback(const geometry_msgs::PoseStamped::ConstPtr& input)
   previous_gnss_time = current_gnss_time;
 }
 
-static void initialpose_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& input)
+static void initialpose_callback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& input)   // 比PoseStamped中的pose多了个协方差
 {
   tf::TransformListener listener;
-  tf::StampedTransform transform;
+  tf::StampedTransform transform;   // 获取input到"/map"坐标的变换关系
   try
   {
     ros::Time now = ros::Time(0);
@@ -630,7 +633,7 @@ static void initialpose_callback(const geometry_msgs::PoseWithCovarianceStamped:
   }
   else
   {
-    current_pose.x = input->pose.pose.position.x + transform.getOrigin().x();
+    current_pose.x = input->pose.pose.position.x + transform.getOrigin().x();   // 变换的话，则做平移
     current_pose.y = input->pose.pose.position.y + transform.getOrigin().y();
     current_pose.z = input->pose.pose.position.z + transform.getOrigin().z();
   }
@@ -1034,7 +1037,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
       ndt.align(*output_cloud, init_guess);		// 计算需要的刚体变换以便将输入的源点云匹配到目标点云
       align_end = std::chrono::system_clock::now();
 
-      has_converged = ndt.hasConverged();
+      has_converged = ndt.hasConverged();   // 收敛标志
 
       t = ndt.getFinalTransformation();			// 获取最最终的变换参数，t 是 base_link旋转矩阵？
       iteration = ndt.getFinalNumIteration();	// 迭代次数
@@ -1673,12 +1676,12 @@ int main(int argc, char** argv)
   ndt_reliability_pub = nh.advertise<std_msgs::Float32>("/ndt_reliability", 10);
 
   // Subscribers
-  ros::Subscriber param_sub = nh.subscribe("config/ndt", 10, param_callback);
-  ros::Subscriber gnss_sub = nh.subscribe("gnss_pose", 10, gnss_callback);
-  //  ros::Subscriber map_sub = nh.subscribe("points_map", 1, map_callback);
-  ros::Subscriber initialpose_sub = nh.subscribe("initialpose", 10, initialpose_callback);
-  ros::Subscriber points_sub = nh.subscribe("filtered_points", _queue_size, points_callback);
-  ros::Subscriber odom_sub = nh.subscribe("/vehicle/odom", _queue_size * 10, odom_callback);
+  ros::Subscriber param_sub = nh.subscribe("config/ndt", 10, param_callback);             // ndt参数设置
+  ros::Subscriber gnss_sub = nh.subscribe("gnss_pose", 10, gnss_callback);                // gnss定位信息
+  //  ros::Subscriber map_sub = nh.subscribe("points_map", 1, map_callback);              // 用另外的线程实现了。
+  ros::Subscriber initialpose_sub = nh.subscribe("initialpose", 10, initialpose_callback);    // 设置初始位置
+  ros::Subscriber points_sub = nh.subscribe("filtered_points", _queue_size, points_callback); // 待变换的点云输入，如scan
+  ros::Subscriber odom_sub = nh.subscribe("/vehicle/odom", _queue_size * 10, odom_callback); 
   ros::Subscriber imu_sub = nh.subscribe(_imu_topic.c_str(), _queue_size * 10, imu_callback);
 
   pthread_t thread;
