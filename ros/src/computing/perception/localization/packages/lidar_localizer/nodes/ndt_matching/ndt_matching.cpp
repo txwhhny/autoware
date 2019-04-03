@@ -737,7 +737,7 @@ static void imu_odom_calc(ros::Time current_time)     // 结合imu和里程计�
 }
 
 // 在points_callback和odom_callback中调用
-static void odom_calc(ros::Time current_time)                               // 增量数据offset_xxxxx同样在points_callback函数尾部清零
+static void odom_calc(ros::Time current_time)                               // 增量数据offset_xxxxx同样在points_callback函数尾部清零，diff_xxx是两帧数据间的差
 {
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
@@ -770,7 +770,7 @@ static void odom_calc(ros::Time current_time)                               // �
 }
 
 // 在points_callback和imu_callback中调用
-static void imu_calc(ros::Time current_time)    // 增量数据offset_xxxxx，同样在points_callback函数尾部清零
+static void imu_calc(ros::Time current_time)    // 增量数据offset_xxxxx，同样在points_callback函数尾部清零，diff_xxx是两帧数据间的差
 {
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
@@ -888,7 +888,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
 
   double imu_roll, imu_pitch, imu_yaw;
   tf::Quaternion imu_orientation;
-  tf::quaternionMsgToTF(input->orientation, imu_orientation);
+  tf::quaternionMsgToTF(input->orientation, imu_orientation);         // 从消息中取得四元数
   tf::Matrix3x3(imu_orientation).getRPY(imu_roll, imu_pitch, imu_yaw);
 
   imu_roll = wrapToPmPi(imu_roll);    // 转成从-pi到pi之间的弧度
@@ -896,7 +896,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
   imu_yaw = wrapToPmPi(imu_yaw);
 
   static double previous_imu_roll = imu_roll, previous_imu_pitch = imu_pitch, previous_imu_yaw = imu_yaw;
-  const double diff_imu_roll = calcDiffForRadian(imu_roll, previous_imu_roll);    // imu_roll - previous_imu_roll，同时处理成-pi到pi之间的弧度值
+  const double diff_imu_roll = calcDiffForRadian(imu_roll, previous_imu_roll);    // 角度增量，imu_roll - previous_imu_roll，同时处理成-pi到pi之间的弧度值
   const double diff_imu_pitch = calcDiffForRadian(imu_pitch, previous_imu_pitch);
   const double diff_imu_yaw = calcDiffForRadian(imu_yaw, previous_imu_yaw);
 
@@ -909,7 +909,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
 
   if (diff_time != 0)
   {
-    imu.angular_velocity.x = diff_imu_roll / diff_time;
+    imu.angular_velocity.x = diff_imu_roll / diff_time;   // 角速度
     imu.angular_velocity.y = diff_imu_pitch / diff_time;
     imu.angular_velocity.z = diff_imu_yaw / diff_time;
   }
@@ -1048,7 +1048,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)    
       iteration = ndt.getFinalNumIteration();	// 迭代次数
 
       getFitnessScore_start = std::chrono::system_clock::now();
-      fitness_score = ndt.getFitnessScore();	// 配准得分
+      fitness_score = ndt.getFitnessScore();	// 源点云到参考点云的小立方体间的距离之和。
       getFitnessScore_end = std::chrono::system_clock::now();
 
       trans_probability = ndt.getTransformationProbability();   // 获得配准可能性？!
@@ -1110,7 +1110,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)    
 #endif
     align_time = std::chrono::duration_cast<std::chrono::microseconds>(align_end - align_start).count() / 1000.0;	// 计算align和fit的用时
 
-    t2 = t * tf_btol.inverse();   // t-baselink to t2-localizer
+    t2 = t * tf_btol.inverse();   // t应该localizer，转换到base_link-t2
 
     getFitnessScore_time =
         std::chrono::duration_cast<std::chrono::microseconds>(getFitnessScore_end - getFitnessScore_start).count() /
@@ -1124,10 +1124,10 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)    
                    static_cast<double>(t(2, 0)), static_cast<double>(t(2, 1)), static_cast<double>(t(2, 2)));
 
     // Update localizer_pose
-    localizer_pose.x = t(0, 3);
+    localizer_pose.x = t(0, 3);   // 当前小车在localizer(map)坐标下的位置？
     localizer_pose.y = t(1, 3);
     localizer_pose.z = t(2, 3);
-    mat_l.getRPY(localizer_pose.roll, localizer_pose.pitch, localizer_pose.yaw, 1);
+    mat_l.getRPY(localizer_pose.roll, localizer_pose.pitch, localizer_pose.yaw, 1); // 根据旋转矩阵获得rpy
 
     tf::Matrix3x3 mat_b;  // base_link
     mat_b.setValue(static_cast<double>(t2(0, 0)), static_cast<double>(t2(0, 1)), static_cast<double>(t2(0, 2)),
@@ -1145,7 +1145,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)    
                               (ndt_pose.y - predict_pose_for_ndt.y) * (ndt_pose.y - predict_pose_for_ndt.y) +
                               (ndt_pose.z - predict_pose_for_ndt.z) * (ndt_pose.z - predict_pose_for_ndt.z));
 
-    if (predict_pose_error <= PREDICT_POSE_THRESHOLD)
+    if (predict_pose_error <= PREDICT_POSE_THRESHOLD)   // 如果ndt确定的pose和传感器计算出的预测pose相差较大，则使用预测位置
     {
       use_predict_pose = 0;
     }
@@ -1155,7 +1155,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)    
     }
     use_predict_pose = 0;	//？？？什么情况
 
-    if (use_predict_pose == 0) // 上一句导致这个分支永不执行
+    if (use_predict_pose == 0) // 上一句导致只执行这个分支，也就是当前位置总采用ndt计算出来的结果。
     {
       current_pose.x = ndt_pose.x;
       current_pose.y = ndt_pose.y;
@@ -1654,7 +1654,7 @@ int main(int argc, char** argv)
   Eigen::AngleAxisf rot_x_btol(_tf_roll, Eigen::Vector3f::UnitX());  // rot: rotation
   Eigen::AngleAxisf rot_y_btol(_tf_pitch, Eigen::Vector3f::UnitY());
   Eigen::AngleAxisf rot_z_btol(_tf_yaw, Eigen::Vector3f::UnitZ());
-  tf_btol = (tl_btol * rot_z_btol * rot_y_btol * rot_x_btol).matrix();	// base_link与localizer之间的tf变换
+  tf_btol = (tl_btol * rot_z_btol * rot_y_btol * rot_x_btol).matrix();	// base_link到localizer的变换矩阵
 
   // Updated in initialpose_callback or gnss_callback
   initial_pose.x = 0.0;
