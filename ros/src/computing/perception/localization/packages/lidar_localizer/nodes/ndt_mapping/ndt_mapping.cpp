@@ -164,14 +164,14 @@ static std::string filename;
 
 static void param_callback(const autoware_config_msgs::ConfigNDTMapping::ConstPtr& input)
 {
-  ndt_res = input->resolution;
+  ndt_res = input->resolution;                        // ndt 参数
   step_size = input->step_size;
   trans_eps = input->trans_epsilon;
   max_iter = input->max_iterations;
-  voxel_leaf_size = input->leaf_size;
-  min_scan_range = input->min_scan_range;
+  voxel_leaf_size = input->leaf_size;                 // 过滤器的网格大小？
+  min_scan_range = input->min_scan_range;             // 用于初步过滤不要的点云
   max_scan_range = input->max_scan_range;
-  min_add_scan_shift = input->min_add_scan_shift;
+  min_add_scan_shift = input->min_add_scan_shift;     // 两次采样点云(用于map)的依据，即机器人的空间位移sqrt(pow(x,2) + pow(y,2))大于该值。
 
   std::cout << "param_callback" << std::endl;
   std::cout << "ndt_res: " << ndt_res << std::endl;
@@ -192,33 +192,33 @@ static void output_callback(const autoware_config_msgs::ConfigNDTMappingOutput::
   std::cout << "filter_res: " << filter_res << std::endl;
   std::cout << "filename: " << filename << std::endl;
 
-  pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr(new pcl::PointCloud<pcl::PointXYZI>(map));
-  pcl::PointCloud<pcl::PointXYZI>::Ptr map_filtered(new pcl::PointCloud<pcl::PointXYZI>());
+  pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr(new pcl::PointCloud<pcl::PointXYZI>(map));   // 原始地图
+  pcl::PointCloud<pcl::PointXYZI>::Ptr map_filtered(new pcl::PointCloud<pcl::PointXYZI>()); // 过滤后的地图
   map_ptr->header.frame_id = "map";
   map_filtered->header.frame_id = "map";
-  sensor_msgs::PointCloud2::Ptr map_msg_ptr(new sensor_msgs::PointCloud2);
+  sensor_msgs::PointCloud2::Ptr map_msg_ptr(new sensor_msgs::PointCloud2);    // 地图ros消息
 
   // Apply voxelgrid filter
-  if (filter_res == 0.0)
+  if (filter_res == 0.0)                                                  // 如果网格大小为0，就用原始地图，否则过滤
   {
     std::cout << "Original: " << map_ptr->points.size() << " points." << std::endl;
     pcl::toROSMsg(*map_ptr, *map_msg_ptr);
   }
   else
   {
-    pcl::VoxelGrid<pcl::PointXYZI> voxel_grid_filter;
-    voxel_grid_filter.setLeafSize(filter_res, filter_res, filter_res);
-    voxel_grid_filter.setInputCloud(map_ptr);
-    voxel_grid_filter.filter(*map_filtered);
+    pcl::VoxelGrid<pcl::PointXYZI> voxel_grid_filter;                     // 过滤器
+    voxel_grid_filter.setLeafSize(filter_res, filter_res, filter_res);    // 设置网格大小，x,y,z各个轴的大小
+    voxel_grid_filter.setInputCloud(map_ptr);                             // 原始地图
+    voxel_grid_filter.filter(*map_filtered);                              // 过滤
     std::cout << "Original: " << map_ptr->points.size() << " points." << std::endl;
     std::cout << "Filtered: " << map_filtered->points.size() << " points." << std::endl;
     pcl::toROSMsg(*map_filtered, *map_msg_ptr);
   }
 
-  ndt_map_pub.publish(*map_msg_ptr);
+  ndt_map_pub.publish(*map_msg_ptr);                                      // 发布过滤后的点云
 
   // Writing Point Cloud data to PCD file
-  if (filter_res == 0.0)
+  if (filter_res == 0.0)                                                  // 保存点云到文件
   {
     pcl::io::savePCDFileASCII(filename, *map_ptr);
     std::cout << "Saved " << map_ptr->points.size() << " data points to " << filename << "." << std::endl;
@@ -235,7 +235,7 @@ static void imu_odom_calc(ros::Time current_time)
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
 
-  double diff_imu_roll = imu.angular_velocity.x * diff_time;
+  double diff_imu_roll = imu.angular_velocity.x * diff_time;    // 根据时间间隔和imu角速度计算角度diff
   double diff_imu_pitch = imu.angular_velocity.y * diff_time;
   double diff_imu_yaw = imu.angular_velocity.z * diff_time;
 
@@ -243,16 +243,16 @@ static void imu_odom_calc(ros::Time current_time)
   current_pose_imu_odom.pitch += diff_imu_pitch;
   current_pose_imu_odom.yaw += diff_imu_yaw;
 
-  double diff_distance = odom.twist.twist.linear.x * diff_time;
+  double diff_distance = odom.twist.twist.linear.x * diff_time;   // 根据里程计速度计算运动距离，同时计算各轴距离diff
   offset_imu_odom_x += diff_distance * cos(-current_pose_imu_odom.pitch) * cos(current_pose_imu_odom.yaw);
   offset_imu_odom_y += diff_distance * cos(-current_pose_imu_odom.pitch) * sin(current_pose_imu_odom.yaw);
-  offset_imu_odom_z += diff_distance * sin(-current_pose_imu_odom.pitch);
+  offset_imu_odom_z += diff_distance * sin(-current_pose_imu_odom.pitch);       // 右手坐标系，四指方向为正方向，所以ptich要加个负号
 
-  offset_imu_odom_roll += diff_imu_roll;
+  offset_imu_odom_roll += diff_imu_roll;        // 根据diff计算增量offset
   offset_imu_odom_pitch += diff_imu_pitch;
   offset_imu_odom_yaw += diff_imu_yaw;
 
-  guess_pose_imu_odom.x = previous_pose.x + offset_imu_odom_x;
+  guess_pose_imu_odom.x = previous_pose.x + offset_imu_odom_x;          // 根据增量计算位置估值
   guess_pose_imu_odom.y = previous_pose.y + offset_imu_odom_y;
   guess_pose_imu_odom.z = previous_pose.z + offset_imu_odom_z;
   guess_pose_imu_odom.roll = previous_pose.roll + offset_imu_odom_roll;
@@ -267,7 +267,7 @@ static void odom_calc(ros::Time current_time)
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
 
-  double diff_odom_roll = odom.twist.twist.angular.x * diff_time;
+  double diff_odom_roll = odom.twist.twist.angular.x * diff_time;   // 根据里程计角速度计算角度diff
   double diff_odom_pitch = odom.twist.twist.angular.y * diff_time;
   double diff_odom_yaw = odom.twist.twist.angular.z * diff_time;
 
@@ -275,16 +275,16 @@ static void odom_calc(ros::Time current_time)
   current_pose_odom.pitch += diff_odom_pitch;
   current_pose_odom.yaw += diff_odom_yaw;
 
-  double diff_distance = odom.twist.twist.linear.x * diff_time;
+  double diff_distance = odom.twist.twist.linear.x * diff_time;     // 根据里程计计算运动距离，同事计算各轴距离diff
   offset_odom_x += diff_distance * cos(-current_pose_odom.pitch) * cos(current_pose_odom.yaw);
   offset_odom_y += diff_distance * cos(-current_pose_odom.pitch) * sin(current_pose_odom.yaw);
   offset_odom_z += diff_distance * sin(-current_pose_odom.pitch);
 
-  offset_odom_roll += diff_odom_roll;
+  offset_odom_roll += diff_odom_roll;         // 根据diff计算增量offset
   offset_odom_pitch += diff_odom_pitch;
   offset_odom_yaw += diff_odom_yaw;
 
-  guess_pose_odom.x = previous_pose.x + offset_odom_x;
+  guess_pose_odom.x = previous_pose.x + offset_odom_x;                // 根据增量计算位置估值
   guess_pose_odom.y = previous_pose.y + offset_odom_y;
   guess_pose_odom.z = previous_pose.z + offset_odom_z;
   guess_pose_odom.roll = previous_pose.roll + offset_odom_roll;
@@ -299,7 +299,7 @@ static void imu_calc(ros::Time current_time)
   static ros::Time previous_time = current_time;
   double diff_time = (current_time - previous_time).toSec();
 
-  double diff_imu_roll = imu.angular_velocity.x * diff_time;
+  double diff_imu_roll = imu.angular_velocity.x * diff_time;      // 根据imu角速度计算角度diff
   double diff_imu_pitch = imu.angular_velocity.y * diff_time;
   double diff_imu_yaw = imu.angular_velocity.z * diff_time;
 
@@ -307,7 +307,7 @@ static void imu_calc(ros::Time current_time)
   current_pose_imu.pitch += diff_imu_pitch;
   current_pose_imu.yaw += diff_imu_yaw;
 
-  double accX1 = imu.linear_acceleration.x;
+  double accX1 = imu.linear_acceleration.x;                       // 根据imu的xyz参数，计算实际的xyz加速度分量，右手坐标系
   double accY1 = std::cos(current_pose_imu.roll) * imu.linear_acceleration.y -
                  std::sin(current_pose_imu.roll) * imu.linear_acceleration.z;
   double accZ1 = std::sin(current_pose_imu.roll) * imu.linear_acceleration.y +
@@ -321,19 +321,19 @@ static void imu_calc(ros::Time current_time)
   double accY = std::sin(current_pose_imu.yaw) * accX2 + std::cos(current_pose_imu.yaw) * accY2;
   double accZ = accZ2;
 
-  offset_imu_x += current_velocity_imu_x * diff_time + accX * diff_time * diff_time / 2.0;
+  offset_imu_x += current_velocity_imu_x * diff_time + accX * diff_time * diff_time / 2.0;    // 根据加速度计算距离增量offset
   offset_imu_y += current_velocity_imu_y * diff_time + accY * diff_time * diff_time / 2.0;
   offset_imu_z += current_velocity_imu_z * diff_time + accZ * diff_time * diff_time / 2.0;
 
-  current_velocity_imu_x += accX * diff_time;
+  current_velocity_imu_x += accX * diff_time;     // 计算各个轴当前速度
   current_velocity_imu_y += accY * diff_time;
   current_velocity_imu_z += accZ * diff_time;
 
-  offset_imu_roll += diff_imu_roll;
+  offset_imu_roll += diff_imu_roll;               // 计算角度增强
   offset_imu_pitch += diff_imu_pitch;
   offset_imu_yaw += diff_imu_yaw;
 
-  guess_pose_imu.x = previous_pose.x + offset_imu_x;
+  guess_pose_imu.x = previous_pose.x + offset_imu_x;              // 计算位置估值
   guess_pose_imu.y = previous_pose.y + offset_imu_y;
   guess_pose_imu.z = previous_pose.z + offset_imu_z;
   guess_pose_imu.roll = previous_pose.roll + offset_imu_roll;
@@ -357,7 +357,7 @@ static double wrapToPmPi(double a_angle_rad)
   return wrapToPm(a_angle_rad, M_PI);
 }
 
-static double calcDiffForRadian(const double lhs_rad, const double rhs_rad)
+static double calcDiffForRadian(const double lhs_rad, const double rhs_rad)   // 计算俩弧度差值，并处理成-pi到pi之间
 {
   double diff_rad = lhs_rad - rhs_rad;
   if (diff_rad >= M_PI)
@@ -401,7 +401,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
 {
   // std::cout << __func__ << std::endl;
 
-  if (_imu_upside_down)
+  if (_imu_upside_down)     // imu倒装处理
     imuUpsideDown(input);
 
   const ros::Time current_time = input->header.stamp;
@@ -410,7 +410,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
 
   double imu_roll, imu_pitch, imu_yaw;
   tf::Quaternion imu_orientation;
-  tf::quaternionMsgToTF(input->orientation, imu_orientation);
+  tf::quaternionMsgToTF(input->orientation, imu_orientation);       // geometry_msgs::Quaternion转成tf的Quaternion
   tf::Matrix3x3(imu_orientation).getRPY(imu_roll, imu_pitch, imu_yaw);
 
   imu_roll = wrapToPmPi(imu_roll);
@@ -418,7 +418,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
   imu_yaw = wrapToPmPi(imu_yaw);
 
   static double previous_imu_roll = imu_roll, previous_imu_pitch = imu_pitch, previous_imu_yaw = imu_yaw;
-  const double diff_imu_roll = calcDiffForRadian(imu_roll, previous_imu_roll);
+  const double diff_imu_roll = calcDiffForRadian(imu_roll, previous_imu_roll);    // 计算角度差值
   const double diff_imu_pitch = calcDiffForRadian(imu_pitch, previous_imu_pitch);
   const double diff_imu_yaw = calcDiffForRadian(imu_yaw, previous_imu_yaw);
 
@@ -431,7 +431,7 @@ static void imu_callback(const sensor_msgs::Imu::Ptr& input)
 
   if (diff_time != 0)
   {
-    imu.angular_velocity.x = diff_imu_roll / diff_time;
+    imu.angular_velocity.x = diff_imu_roll / diff_time;       // 计算imu变量的各轴角速度
     imu.angular_velocity.y = diff_imu_pitch / diff_time;
     imu.angular_velocity.z = diff_imu_yaw / diff_time;
   }
@@ -468,7 +468,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
 
   pcl::fromROSMsg(*input, tmp);
 
-  for (pcl::PointCloud<pcl::PointXYZI>::const_iterator item = tmp.begin(); item != tmp.end(); item++)
+  for (pcl::PointCloud<pcl::PointXYZI>::const_iterator item = tmp.begin(); item != tmp.end(); item++)   // 过滤掉无效点，放到scan里面
   {
     p.x = (double)item->x;
     p.y = (double)item->y;
@@ -487,7 +487,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
   // Add initial point cloud to velodyne_map
   if (initial_scan_loaded == 0)
   {
-    pcl::transformPointCloud(*scan_ptr, *transformed_scan_ptr, tf_btol);
+    pcl::transformPointCloud(*scan_ptr, *transformed_scan_ptr, tf_btol);  // baselink到localizer的变换
     map += *transformed_scan_ptr;
     initial_scan_loaded = 1;
   }
@@ -496,7 +496,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
   pcl::VoxelGrid<pcl::PointXYZI> voxel_grid_filter;
   voxel_grid_filter.setLeafSize(voxel_leaf_size, voxel_leaf_size, voxel_leaf_size);
   voxel_grid_filter.setInputCloud(scan_ptr);
-  voxel_grid_filter.filter(*filtered_scan_ptr);
+  voxel_grid_filter.filter(*filtered_scan_ptr);                         // 按网格大小过滤，并存放到filtered_scan_ptr
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr map_ptr(new pcl::PointCloud<pcl::PointXYZI>(map));
 
@@ -538,7 +538,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
 #endif
 
   static bool is_first_map = true;
-  if (is_first_map == true)
+  if (is_first_map == true)                             // 首次设置ndt的target
   {
     if (_method_type == MethodType::PCL_GENERIC)
       ndt.setInputTarget(map_ptr);
@@ -554,7 +554,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
 #endif
     is_first_map = false;
   }
-
+  // 计算各类位置估值及选择
   guess_pose.x = previous_pose.x + diff_x;
   guess_pose.y = previous_pose.y + diff_y;
   guess_pose.z = previous_pose.z + diff_z;
@@ -579,6 +579,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
   else
     guess_pose_for_ndt = guess_pose;
 
+  // 根据位置估值计算变换矩阵估值
   Eigen::AngleAxisf init_rotation_x(guess_pose_for_ndt.roll, Eigen::Vector3f::UnitX());
   Eigen::AngleAxisf init_rotation_y(guess_pose_for_ndt.pitch, Eigen::Vector3f::UnitY());
   Eigen::AngleAxisf init_rotation_z(guess_pose_for_ndt.yaw, Eigen::Vector3f::UnitZ());
@@ -595,7 +596,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr output_cloud(new pcl::PointCloud<pcl::PointXYZI>);
 
-  if (_method_type == MethodType::PCL_GENERIC)
+  if (_method_type == MethodType::PCL_GENERIC)            // 配准及状态参数获取
   {
     ndt.align(*output_cloud, init_guess);
     fitness_score = ndt.getFitnessScore();
@@ -747,6 +748,7 @@ static void points_callback(const sensor_msgs::PointCloud2::ConstPtr& input)
   offset_imu_odom_pitch = 0.0;
   offset_imu_odom_yaw = 0.0;
 
+  // 上次录用点云时机器人的位置和当前位置超过了shift,则把这次点云添加到map，同事更新ndt的target(因为map_ptr是拷贝构造于map的，所以map更新了，需要重新设置)
   // Calculate the shift between added_pos and current_pos
   double shift = sqrt(pow(current_pose.x - added_pose.x, 2.0) + pow(current_pose.y - added_pose.y, 2.0));
   if (shift >= min_add_scan_shift)
