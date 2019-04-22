@@ -127,7 +127,7 @@ std::vector<std::string> cached_arealist_paths;
 GetFile gf;
 RequestQueue request_queue;
 
-Tbl read_csv(const std::string& path)
+Tbl read_csv(const std::string& path)     // 从文件中读取每一行，一行中的各个字段用“，”隔开，之后返回Tbl
 {
 	std::ifstream ifs(path.c_str());
 	std::string line;
@@ -143,7 +143,7 @@ Tbl read_csv(const std::string& path)
 	return ret;
 }
 
-void write_csv(const std::string& path, const Tbl& tbl)
+void write_csv(const std::string& path, const Tbl& tbl) // 将tbl保存成文件，一行中的各个字段用","隔开
 {
 	std::ofstream ofs(path.c_str());
 	for (const std::vector<std::string>& cols : tbl) {
@@ -193,25 +193,25 @@ void write_arealist(const std::string& path, const AreaList& areas)
 	write_csv(path, tbl);
 }
 
-bool is_downloaded(const std::string& path)
+bool is_downloaded(const std::string& path)   // 判断文件是否存在
 {
 	struct stat st;
 	return (stat(path.c_str(), &st) == 0);
 }
 
-bool is_in_area(double x, double y, const Area& area, double m)
+bool is_in_area(double x, double y, const Area& area, double m)   // 判断x、y这一点是否处于area中，m相当于容错范围
 {
 	return ((area.x_min - m) <= x && x <= (area.x_max + m) && (area.y_min - m) <= y && y <= (area.y_max + m));
 }
 
-std::string create_location(int x, int y)
+std::string create_location(int x, int y)   // 返回如："data/map/12000/8000/pointcloud/"形式的字符串
 {
 	x -= x % ROUNDING_UNIT;
 	y -= y % ROUNDING_UNIT;
 	return ("data/map/" + std::to_string(y) + "/" + std::to_string(x) + "/pointcloud/");
 }
 
-void cache_arealist(const Area& area, AreaList& areas)
+void cache_arealist(const Area& area, AreaList& areas)    // 把area保存到areas，存在则不处理
 {
 	for (const Area& a : areas) {
 		if (a.path == area.path)
@@ -226,12 +226,12 @@ int download(GetFile gf, const std::string& tmp, const std::string& loc, const s
 	pathname += tmp;
 	std::istringstream iss(loc);
 	std::string col;
-	while (std::getline(iss, col, '/')) {
+	while (std::getline(iss, col, '/')) {     // 相当于递归创建多级子目录，因为mkdir只能创建一级目录
 		pathname += col + "/";
 		mkdir(pathname.c_str(), 0755);
 	}
 
-	return gf.GetHTTPFile(loc + filename);
+	return gf.GetHTTPFile(loc + filename);    // 参数值为：data/map/12000/8000/pointcloud/arealist.txt，下载文件
 }
 
 void download_map()
@@ -253,9 +253,9 @@ void download_map()
 		locs.push_back(create_location(x_max, y_min));
 		locs.push_back(create_location(x_max, y_max));
 		for (const std::string& loc : locs) { // XXX better way?
-			std::string arealist_path = TEMPORARY_DIRNAME + loc + AREALIST_FILENAME;
+			std::string arealist_path = TEMPORARY_DIRNAME + loc + AREALIST_FILENAME;  // 字符串格式如："/tmp/data/map/12000/8000/pointcloud/arealist.txt"
 
-			bool cached = false;
+			bool cached = false;    // 判断arealist_path是否存在于cached_arealist_paths中，存在则跳过
 			for (const std::string& path : cached_arealist_paths) {
 				if (path == arealist_path) {
 					cached = true;
@@ -273,7 +273,7 @@ void download_map()
 					continue;
 				areas = read_arealist(arealist_path);
 				for (Area& area : areas)
-					area.path = TEMPORARY_DIRNAME + loc + basename(area.path.c_str());
+					area.path = TEMPORARY_DIRNAME + loc + basename(area.path.c_str());    // 这里area.path应该就是地图名称（包含路径）
 				write_arealist(arealist_path, areas);
 			}
 			for (const Area& area : areas)
@@ -287,7 +287,7 @@ void download_map()
 				int y_area = static_cast<int>(area.y_max - MARGIN_UNIT);
 				std::string loc = create_location(x_area, y_area);
 				if (is_downloaded(area.path) ||
-				    download(gf, TEMPORARY_DIRNAME, loc, basename(area.path.c_str())) == 0) {
+				    download(gf, TEMPORARY_DIRNAME, loc, basename(area.path.c_str())) == 0) { // 下载地图
 					std::unique_lock<std::mutex> lock(downloaded_areas_mtx);
 					cache_arealist(area, downloaded_areas);
 				}
@@ -296,16 +296,17 @@ void download_map()
 	}
 }
 
+// 加载包含p点的地图，多个则拼接
 sensor_msgs::PointCloud2 create_pcd(const geometry_msgs::Point& p)
 {
 	sensor_msgs::PointCloud2 pcd, part;
 	std::unique_lock<std::mutex> lock(downloaded_areas_mtx);
 	for (const Area& area : downloaded_areas) {
-		if (is_in_area(p.x, p.y, area, margin)) {
+		if (is_in_area(p.x, p.y, area, margin)) {   // 如果p处于area范围中，则加载area指定的pcd文件。
 			if (pcd.width == 0)
 				pcl::io::loadPCDFile(area.path.c_str(), pcd);
 			else {
-				pcl::io::loadPCDFile(area.path.c_str(), part);
+				pcl::io::loadPCDFile(area.path.c_str(), part);    // 多个文件则拼接；pcd文件名在downloaded_areas应该要有顺序要求吧？
 				pcd.width += part.width;
 				pcd.row_step += part.row_step;
 				pcd.data.insert(pcd.data.end(), part.data.begin(), part.data.end());
@@ -316,10 +317,11 @@ sensor_msgs::PointCloud2 create_pcd(const geometry_msgs::Point& p)
 	return pcd;
 }
 
-sensor_msgs::PointCloud2 create_pcd(const std::vector<std::string>& pcd_paths, int* ret_err = NULL)
+// 从一个vector<pcb_paths>的多个文件名加载成地图
+sensor_msgs::PointCloud2 create_pcd(const std::vector<std::string>& pcd_paths, int* ret_err = NULL)		
 {
 	sensor_msgs::PointCloud2 pcd, part;
-	for (const std::string& path : pcd_paths) {
+	for (const std::string& path : pcd_paths) {       // 加载pcd_paths中指定的所有文件，多个则拼接；同上，文件顺序要求？
 		// Following outputs are used for progress bar of Runtime Manager.
 		if (pcd.width == 0) {
 			if (pcl::io::loadPCDFile(path.c_str(), pcd) == -1) {
@@ -342,7 +344,7 @@ sensor_msgs::PointCloud2 create_pcd(const std::vector<std::string>& pcd_paths, i
 	return pcd;
 }
 
-void publish_pcd(sensor_msgs::PointCloud2 pcd, const int* errp = NULL)
+void publish_pcd(sensor_msgs::PointCloud2 pcd, const int* errp = NULL) // 发布地图点云以及地图状态数据
 {
 	if (pcd.width != 0) {
 		pcd.header.frame_id = "map";
@@ -515,7 +517,7 @@ int main(int argc, char **argv)
 	ros::Subscriber current_sub;
 	ros::Subscriber initial_sub;
 	ros::Subscriber waypoints_sub;
-	if (margin < 0) {
+	if (margin < 0) {		// noupdate模式，直接发布命令行参数列表中制定的pcd路径对应的文件，多个文件拼成一个点云
 		int err = 0;
 		publish_pcd(create_pcd(pcd_paths, &err), &err);
 	} else {
@@ -534,12 +536,12 @@ int main(int argc, char **argv)
 			} catch (std::exception &ex) {
 				ROS_ERROR_STREAM("failed to create thread from " << ex.what());
 			}
-		} else {
+		} else {					// 比较arealist中的路径和命令行参数中的路径，匹配的，才进行缓存
 			AreaList areas = read_arealist(arealist_path);
 			for (const Area& area : areas) {
 				for (const std::string& path : pcd_paths) {
 					if (path == area.path)
-						cache_arealist(area, downloaded_areas);
+						cache_arealist(area, downloaded_areas);					// 缓存area到downloaded_areas,如果已经存在该area，则什么都不做
 				}
 			}
 		}
