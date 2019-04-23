@@ -265,10 +265,10 @@ void download_map()
 			if (cached)
 				continue;
 
-			AreaList areas;
+			AreaList areas;											// 检查arealist_path文件是否下载
 			if (is_downloaded(arealist_path))
 				areas = read_arealist(arealist_path);
-			else {
+			else {															// 没下载的话，下载下来，并修改area.path为不带扩展名的路径,
 				if (download(gf, TEMPORARY_DIRNAME, loc, AREALIST_FILENAME) != 0)
 					continue;
 				areas = read_arealist(arealist_path);
@@ -289,7 +289,7 @@ void download_map()
 				if (is_downloaded(area.path) ||
 				    download(gf, TEMPORARY_DIRNAME, loc, basename(area.path.c_str())) == 0) { // 下载地图
 					std::unique_lock<std::mutex> lock(downloaded_areas_mtx);
-					cache_arealist(area, downloaded_areas);
+					cache_arealist(area, downloaded_areas);		// 地图如果已经存在（下载下来了），则缓存这个area到downloaded_areas
 				}
 			}
 		}
@@ -333,7 +333,7 @@ sensor_msgs::PointCloud2 create_pcd(const std::vector<std::string>& pcd_paths, i
 				std::cerr << "load failed " << path << std::endl;
 				if (ret_err) *ret_err = 1;
 			}
-			pcd.width += part.width;
+			pcd.width += part.width;										// 由此计算方式（width相加，row_step相加，数据又直接追加在后面），可推断pcd.data是按列存储的？
 			pcd.row_step += part.row_step;
 			pcd.data.insert(pcd.data.end(), part.data.begin(), part.data.end());
 		}
