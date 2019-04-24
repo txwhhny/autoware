@@ -407,21 +407,21 @@ void publish_dragged_pcd(const geometry_msgs::PoseWithCovarianceStamped& msg)
 	publish_pcd(create_pcd(p));
 }
 
-void request_lookahead_download(const autoware_msgs::LaneArray& msg)
+void request_lookahead_download(const autoware_msgs::LaneArray& msg)		// 把每个车道的各个航点，进队列，进队列的点通过create_pcd加载地图
 {
 	request_queue.clear_look_ahead();
 
-	for (const autoware_msgs::Lane& l : msg.lanes) {
+	for (const autoware_msgs::Lane& l : msg.lanes) {		// 遍历各个车道
 		size_t end = l.waypoints.size() - 1;
 		double distance = 0;
 		double threshold = (MARGIN_UNIT / 2) + margin; // XXX better way?
 		for (size_t i = 0; i <= end; ++i) {
-			if (i == 0 || i == end) {
+			if (i == 0 || i == end) {						// 单个车道的首尾航点，则直接进队列
 				geometry_msgs::Point p;
 				p.x = l.waypoints[i].pose.pose.position.x;
 				p.y = l.waypoints[i].pose.pose.position.y;
 				request_queue.enqueue_look_ahead(p);
-			} else {
+			} else {										// 其他航点，则检查与上次进队列的航点的距离，大于阈值则把当前航点进队列
 				geometry_msgs::Point p1, p2;
 				p1.x = l.waypoints[i].pose.pose.position.x;
 				p1.y = l.waypoints[i].pose.pose.position.y;
