@@ -360,7 +360,7 @@ void publish_pcd(sensor_msgs::PointCloud2 pcd, const int* errp = NULL) // 发布
 void publish_gnss_pcd(const geometry_msgs::PoseStamped& msg)
 {
 	ros::Time now = ros::Time::now();
-	if (((now - current_time).toSec() * 1000) < fallback_rate)
+	if (((now - current_time).toSec() * 1000) < fallback_rate)	// fallback_rate == 2 * update_rate，这里判断这个意思是如果current_pose正常，则这里一直会返回，相当于无作用
 		return;
 	if (((now - gnss_time).toSec() * 1000) < update_rate)
 		return;
