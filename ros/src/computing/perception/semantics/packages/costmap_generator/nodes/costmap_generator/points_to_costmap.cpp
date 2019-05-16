@@ -39,7 +39,7 @@ PointsToCostmap::~PointsToCostmap()
 {
 }
 
-void PointsToCostmap::initGridmapParam(const grid_map::GridMap& gridmap)
+void PointsToCostmap::initGridmapParam(const grid_map::GridMap& gridmap)    // 保存GridMap的相关参数
 {
   grid_length_x_ = gridmap.getLength().x();
   grid_length_y_ = gridmap.getLength().y();
@@ -48,7 +48,7 @@ void PointsToCostmap::initGridmapParam(const grid_map::GridMap& gridmap)
   grid_position_y_ = gridmap.getPosition().y();
 }
 
-bool PointsToCostmap::isValidInd(const grid_map::Index& grid_ind)
+bool PointsToCostmap::isValidInd(const grid_map::Index& grid_ind)   // 判断某一个index是否处于grid中
 {
   bool is_valid = false;
   int x_grid_ind = grid_ind.x();
@@ -61,22 +61,22 @@ bool PointsToCostmap::isValidInd(const grid_map::Index& grid_ind)
   return is_valid;
 }
 
-grid_map::Index PointsToCostmap::fetchGridIndexFromPoint(const pcl::PointXYZ& point)
+grid_map::Index PointsToCostmap::fetchGridIndexFromPoint(const pcl::PointXYZ& point)  // 计算point与origin的差值，生成grid_map::Index。
 {
   // calculate out_grid_map position
   const double origin_x_offset = grid_length_x_ / 2.0 - grid_position_x_;
   const double origin_y_offset = grid_length_y_ / 2.0 - grid_position_y_;
   // coordinate conversion for making index. Set bottom left to the origin of coordinate (0, 0) in gridmap area
   double mapped_x = (grid_length_x_ - origin_x_offset - point.x) / grid_resolution_;
-  double mapped_y = (grid_length_y_ - origin_y_offset - point.y) / grid_resolution_;
+  double mapped_y = (grid_length_y_ - origin_y_offset - point.y) / grid_resolution_;  
 
-  int mapped_x_ind = std::ceil(mapped_x);
+  int mapped_x_ind = std::ceil(mapped_x);   // 如何保证这两个值都是 >= 0 ????
   int mapped_y_ind = std::ceil(mapped_y);
   grid_map::Index index(mapped_x_ind, mapped_y_ind);
   return index;
 }
 
-std::vector<std::vector<std::vector<double>>> PointsToCostmap::assignPoints2GridCell(
+std::vector<std::vector<std::vector<double>>> PointsToCostmap::assignPoints2GridCell(   // 把传感器的点云数据的z按grid的分辨率，添加到各个cell中保存
     const grid_map::GridMap& gridmap, const pcl::PointCloud<pcl::PointXYZ>::Ptr& in_sensor_points)
 {
   double y_cell_size = std::ceil(grid_length_y_ * (1 / grid_resolution_));
@@ -107,7 +107,7 @@ grid_map::Matrix PointsToCostmap::calculateCostmap(const double maximum_height_t
   {
     for (size_t y_ind = 0; y_ind < grid_vec[0].size(); y_ind++)
     {
-      if (grid_vec[x_ind][y_ind].size() == 0)
+      if (grid_vec[x_ind][y_ind].size() == 0)     // 这个cell没有点，则赋值grid_min_value
       {
         gridmap_data(x_ind, y_ind) = grid_min_value;
         continue;
@@ -118,7 +118,7 @@ grid_map::Matrix PointsToCostmap::calculateCostmap(const double maximum_height_t
         {
           continue;
         }
-        gridmap_data(x_ind, y_ind) = grid_max_value;
+        gridmap_data(x_ind, y_ind) = grid_max_value;    // 这个cell中，某个点的z落在lidar的最低最高阈值之间的，则赋值为grid_max_value
         break;
       }
     }
