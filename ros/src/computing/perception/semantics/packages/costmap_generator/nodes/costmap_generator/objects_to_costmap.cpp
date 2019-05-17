@@ -53,22 +53,22 @@ ObjectsToCostmap::~ObjectsToCostmap()
 Eigen::MatrixXd ObjectsToCostmap::makeRectanglePoints(const autoware_msgs::DetectedObject& in_object,
                                                      const double expand_rectangle_size)
 {
-  double length = in_object.dimensions.x + expand_rectangle_size;
+  double length = in_object.dimensions.x + expand_rectangle_size;   // in_object.dimensions.x推断为object的原长度
   double width = in_object.dimensions.y + expand_rectangle_size;
-  Eigen::MatrixXd origin_points(NUMBER_OF_DIMENSIONS, NUMBER_OF_POINTS);
-  origin_points << length / 2, length / 2, -length / 2, -length / 2, width / 2, -width / 2, -width / 2, width / 2;
+  Eigen::MatrixXd origin_points(NUMBER_OF_DIMENSIONS, NUMBER_OF_POINTS);  // 以坐标原点做中心，进行长宽修改，也就是扩展
+  origin_points << length / 2, length / 2, -length / 2, -length / 2, width / 2, -width / 2, -width / 2, width / 2;  // 2行4列，由数据推断按行赋值，得到四个顶点
 
   double yaw = tf::getYaw(in_object.pose.orientation);
   Eigen::MatrixXd rotation_matrix(NUMBER_OF_DIMENSIONS, NUMBER_OF_DIMENSIONS);
-  rotation_matrix << std::cos(yaw), -std::sin(yaw), std::sin(yaw), std::cos(yaw);
-  Eigen::MatrixXd rotated_points = rotation_matrix * origin_points;
+  rotation_matrix << std::cos(yaw), -std::sin(yaw), std::sin(yaw), std::cos(yaw);   // 根据pose姿态得到旋转矩阵
+  Eigen::MatrixXd rotated_points = rotation_matrix * origin_points;     // 对扩展后的点做旋转
 
-  double dx = in_object.pose.position.x;
+  double dx = in_object.pose.position.x;  // 原中心点的x对于origin_points(0,0)的delta就是in_object.pose.position.x
   double dy = in_object.pose.position.y;
   Eigen::MatrixXd transformed_points(NUMBER_OF_DIMENSIONS, NUMBER_OF_POINTS);
   Eigen::MatrixXd ones = Eigen::MatrixXd::Ones(1, NUMBER_OF_POINTS);
   transformed_points.row(0) = rotated_points.row(0) + dx * ones;
-  transformed_points.row(1) = rotated_points.row(1) + dy * ones;
+  transformed_points.row(1) = rotated_points.row(1) + dy * ones;      // 平移后得到放大后的四个顶点坐标
   return transformed_points;
 }
 
@@ -85,19 +85,19 @@ grid_map::Polygon ObjectsToCostmap::makePolygonFromObjectBox(const autoware_msgs
   return polygon;
 }
 
-geometry_msgs::Point ObjectsToCostmap::makeExpandedPoint(const geometry_msgs::Point& in_centroid,
+geometry_msgs::Point ObjectsToCostmap::makeExpandedPoint(const geometry_msgs::Point& in_centroid, 
                                                         const geometry_msgs::Point32& in_corner_point,
                                                         const double expand_polygon_size)
 {
   geometry_msgs::Point expanded_point;
-  if(expand_polygon_size == 0)
+  if(expand_polygon_size == 0)    // ==0则表示不放大
   {
     expanded_point.x = in_corner_point.x;
     expanded_point.y = in_corner_point.y;
     return expanded_point;
   }
-  double theta = std::atan2(in_corner_point.y - in_centroid.y, in_corner_point.x - in_centroid.x);
-  double delta_x = expand_polygon_size * std::cos(theta);
+  double theta = std::atan2(in_corner_point.y - in_centroid.y, in_corner_point.x - in_centroid.x);  // 计算质心与目标点的连线与x轴的夹角，取值范围-pi~pi
+  double delta_x = expand_polygon_size * std::cos(theta);   // 以质心in_centroid作为参考点，以expand_polygon_size为缩放尺度，让in_corner_point远离质心，也就相当于多边形放大
   double delta_y = expand_polygon_size * std::sin(theta);
   expanded_point.x = in_corner_point.x + delta_x;
   expanded_point.y = in_corner_point.y + delta_y;
@@ -111,10 +111,10 @@ grid_map::Polygon ObjectsToCostmap::makePolygonFromObjectConvexHull(const autowa
   grid_map::Polygon polygon;
   polygon.setFrameId(in_object.header.frame_id);
 
-  double initial_z = in_object.convex_hull.polygon.points[0].z;
+  double initial_z = in_object.convex_hull.polygon.points[0].z;   // 取多边形的第0点的z平面做参考
   for (size_t index = 0; index < in_object.convex_hull.polygon.points.size(); index++)
   {
-    if(in_object.convex_hull.polygon.points[index].z == initial_z)
+    if(in_object.convex_hull.polygon.points[index].z == initial_z)  // 遍历多边形的所有点，处理与第0个点处于同一z值的平面上的点。
     {
       geometry_msgs::Point centroid = in_object.pose.position;
       geometry_msgs::Point expanded_point = makeExpandedPoint(centroid,
@@ -128,7 +128,7 @@ grid_map::Polygon ObjectsToCostmap::makePolygonFromObjectConvexHull(const autowa
 void ObjectsToCostmap::setCostInPolygon(const grid_map::Polygon& polygon, const std::string& gridmap_layer_name,
                                        const float score, grid_map::GridMap& objects_costmap)
 {
-  grid_map::PolygonIterator iterators(objects_costmap, polygon);
+  grid_map::PolygonIterator iterators(objects_costmap, polygon);    // iterators没用到？
   for (grid_map::PolygonIterator iterator(objects_costmap, polygon); !iterator.isPastEnd(); ++iterator)
   {
     const float current_score = objects_costmap.at(gridmap_layer_name, *iterator);
@@ -155,15 +155,15 @@ grid_map::Matrix ObjectsToCostmap::makeCostmapFromObjects(const grid_map::GridMa
     grid_map::Polygon polygon, expanded_polygon;
     if(use_objects_convex_hull)
     {
-      polygon = makePolygonFromObjectConvexHull(object, not_expand_polygon_size);
-      expanded_polygon = makePolygonFromObjectConvexHull(object, expand_polygon_size);
+      polygon = makePolygonFromObjectConvexHull(object, not_expand_polygon_size);     // 未放大
+      expanded_polygon = makePolygonFromObjectConvexHull(object, expand_polygon_size);  // 多边形z平面(第0个点的z所在的平面)放大后的所有点
     }
     else
     {
-      polygon = makePolygonFromObjectBox(object, not_expand_polygon_size);
-      expanded_polygon = makePolygonFromObjectBox(object, expand_polygon_size);
+      polygon = makePolygonFromObjectBox(object, not_expand_polygon_size);      // 未放大
+      expanded_polygon = makePolygonFromObjectBox(object, expand_polygon_size); // 放大后的4个顶点
     }
-    setCostInPolygon(polygon, OBJECTS_COSTMAP_LAYER_, object.score, objects_costmap);
+    setCostInPolygon(polygon, OBJECTS_COSTMAP_LAYER_, object.score, objects_costmap);   // 如果object.score更大则更新到object_costmap中
     setCostInPolygon(expanded_polygon, EXPANDED_OBJECTS_COSTMAP_LAYER_, object.score, objects_costmap);
   }
   // Applying mean filter to expanded gridmap

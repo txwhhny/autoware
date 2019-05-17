@@ -96,10 +96,10 @@ namespace object_map
 				return area_points_empty;
 
 			// 2 points of line
-			area_points.push_back(vector_map::convertPointToGeomPoint(bp));
+			area_points.push_back(vector_map::convertPointToGeomPoint(bp));		// 线的两个端点
 			area_points.push_back(vector_map::convertPointToGeomPoint(fp));
 
-			line = in_vectormap.findByKey(vector_map::Key<vector_map_msgs::Line>(line.flid));
+			line = in_vectormap.findByKey(vector_map::Key<vector_map_msgs::Line>(line.flid));		// 查找下一条线
 			if (line.lid == 0)
 				return area_points_empty;
 		}
@@ -174,12 +174,12 @@ namespace object_map
 	                                std::vector<std::vector<geometry_msgs::Point>>& out_area_points)
 	{
 		vector_map::VectorMap vmap;
-		vmap.subscribe(in_private_node_handle,
+		vmap.subscribe(in_private_node_handle,	// /vector_map_info/point,/vector_map_info/line,/vector_map_info/area,/vector_map_info/way_area
 		               vector_map::Category::POINT | vector_map::Category::LINE | vector_map::Category::AREA |
-		               vector_map::Category::WAY_AREA, 10);
+		               vector_map::Category::WAY_AREA, 10);		// 订阅指定Category相应的话题，事件循环尝试10次
 
 		std::vector<vector_map_msgs::WayArea> way_areas =
-				vmap.findByFilter([](const vector_map_msgs::WayArea &way_area)
+				vmap.findByFilter([](const vector_map_msgs::WayArea &way_area)		// lambda恒返回true，表示返回所有WayArea数据
 				                  {
 					                  return true;
 				                  });
@@ -192,7 +192,7 @@ namespace object_map
 
 		for (const auto &way_area : way_areas)
 		{
-			vector_map_msgs::Area area = vmap.findByKey(vector_map::Key<vector_map::Area>(way_area.aid));
+			vector_map_msgs::Area area = vmap.findByKey(vector_map::Key<vector_map::Area>(way_area.aid));		// 根据way_area(有waid和aid)的aid，查找area
 			out_area_points.emplace_back(SearchAreaPoints(area, vmap));
 		}
 

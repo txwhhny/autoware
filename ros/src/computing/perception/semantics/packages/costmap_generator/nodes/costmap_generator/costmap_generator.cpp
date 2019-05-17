@@ -157,7 +157,7 @@ grid_map::Matrix CostmapGenerator::generateVectormapCostmap()
   {
     if (!has_subscribed_wayarea_)
     {
-      object_map::LoadRoadAreasFromVectorMap(private_nh_, area_points_);
+      object_map::LoadRoadAreasFromVectorMap(private_nh_, area_points_);  // 事件循环只尝试10次，所以不会一直阻塞在这儿，这里得到的area_points_应该是way的area
     }
     if (!area_points_.empty())
     {
