@@ -162,7 +162,7 @@ grid_map::Matrix CostmapGenerator::generateVectormapCostmap()
     if (!area_points_.empty())
     {
       has_subscribed_wayarea_ = true;
-      object_map::FillPolygonAreas(vectormap_costmap, area_points_, VECTORMAP_COSTMAP_LAYER_, grid_max_value_,
+      object_map::FillPolygonAreas(vectormap_costmap, area_points_, VECTORMAP_COSTMAP_LAYER_, grid_max_value_,    // 根据点来填充多边形
                                    grid_min_value_, grid_min_value_, grid_max_value_, lidar_frame_, map_frame_,
                                    tf_listener_);
     }
@@ -170,7 +170,7 @@ grid_map::Matrix CostmapGenerator::generateVectormapCostmap()
   return vectormap_costmap[VECTORMAP_COSTMAP_LAYER_];
 }
 
-grid_map::Matrix CostmapGenerator::generateCombinedCostmap()
+grid_map::Matrix CostmapGenerator::generateCombinedCostmap()    // 取得所有的最高分
 {
   // assuming combined_costmap is calculated by element wise max operation
   grid_map::GridMap combined_costmap = costmap_;

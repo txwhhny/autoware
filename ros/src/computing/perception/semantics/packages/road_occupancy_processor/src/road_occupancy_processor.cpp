@@ -29,21 +29,21 @@ void ROSRoadOccupancyProcessorApp::ConvertXYZIToRTZ(const pcl::PointCloud<pcl::P
 {
 	out_organized_points.resize(in_cloud->points.size());
 	out_radial_divided_indices.clear();
-	out_radial_divided_indices.resize(radial_dividers_num_);
+	out_radial_divided_indices.resize(radial_dividers_num_);	// 在构造函数中初始化：radial_dividers_num_ = 360 / 0.1
 	out_radial_ordered_clouds.resize(radial_dividers_num_);
 
 	for(size_t i=0; i< in_cloud->points.size(); i++)
 	{
 		PointXYZIRT new_point;
-		auto radius         = (float) sqrt(
+		auto radius         = (float) sqrt(											// 求points[i]，在xy平面上距离z轴或原点的距离
 				in_cloud->points[i].x*in_cloud->points[i].x
 				+ in_cloud->points[i].y*in_cloud->points[i].y
 		);
-		auto theta          = (float) atan2(in_cloud->points[i].y, in_cloud->points[i].x) * 180 / M_PI;
+		auto theta          = (float) atan2(in_cloud->points[i].y, in_cloud->points[i].x) * 180 / M_PI;	// 求points[i]与X轴的夹角，换算成角度
 		if (theta < 0){ theta+=360; }
 
-		auto radial_div     = (size_t) floor(theta/radial_divider_angle_);
-		auto concentric_div = (size_t) floor(fabs(radius/concentric_divider_distance_));
+		auto radial_div     = (size_t) floor(theta/radial_divider_angle_);	// 按radial_divider_angle_为分辨率（0.1），分割theta
+		auto concentric_div = (size_t) floor(fabs(radius/concentric_divider_distance_));	// 距离同理(1）
 
 		new_point.point    = in_cloud->points[i];
 		new_point.radius   = radius;
@@ -111,7 +111,7 @@ bool ROSRoadOccupancyProcessorApp::LoadRoadLayerFromMat(grid_map::GridMap &in_gr
 void ROSRoadOccupancyProcessorApp::Convert3dPointToOccupancy(grid_map::GridMap &in_grid_map,
                                                              const geometry_msgs::Point &in_point, cv::Point &out_point)
 {
-	// calculate position
+	// calculate position			// 这个操作是把点的坐标转为水平为y轴，竖直为x轴，原点在右上角的坐标系，是cv image的组织格式？
 	grid_map::Position map_pos = in_grid_map.getPosition();
 	double origin_x_offset = in_grid_map.getLength().x() / 2.0 - map_pos.x();
 	double origin_y_offset = in_grid_map.getLength().y() / 2.0 - map_pos.y();
@@ -154,11 +154,11 @@ void ROSRoadOccupancyProcessorApp::SetPointInGridMap(grid_map::GridMap &in_grid_
 	if(!rect.contains(cv_point))
 		return;
 
-	if (in_grid_image.at<uchar>(cv_point.y, cv_point.x) != OCCUPANCY_NO_ROAD)
+	if (in_grid_image.at<uchar>(cv_point.y, cv_point.x) != OCCUPANCY_NO_ROAD)	// 没有填充的话，就填充
 	{
-		const int radius = 2;
+		const int radius = 2;	// 圆的半径
 		const int fill = -1;
-		cv::circle(in_grid_image, cv::Point(cv_point.x, cv_point.y), radius, cv::Scalar(in_value), fill);
+		cv::circle(in_grid_image, cv::Point(cv_point.x, cv_point.y), radius, cv::Scalar(in_value), fill);	// fill < 0表示圆被填充
 	}
 }
 
@@ -172,7 +172,7 @@ void ROSRoadOccupancyProcessorApp::GridMapCallback(const grid_map_msgs::GridMap&
 	                                                        CV_8UC1,
 	                                                        grid_min_value_,
 	                                                        grid_max_value_,
-	                                                        road_wayarea_original_mat_);
+	                                                        road_wayarea_original_mat_);	// 得到opencv数据类型的image
 
 	input_gridmap_frame_        = input_grid.getFrameId();
 	input_gridmap_length_       = input_grid.getLength();
@@ -225,23 +225,23 @@ void ROSRoadOccupancyProcessorApp::PointsCallback(const sensor_msgs::PointCloud2
 	pcl::fromROSMsg(*in_ground_cloud_msg, *in_ground_cloud);
 	pcl::fromROSMsg(*in_no_ground_cloud_msg, *in_no_ground_cloud);
 
-	//check that both pointcloud and grid are in the same frame, otherwise transform
+	//check that both pointcloud and grid are in the same frame, otherwise transform		// 确定点云的frame和ouput_gridmap是同一个，否则转为同一个
 	ConvertPointCloud(*in_ground_cloud, output_gridmap.getFrameId(), *final_ground_cloud);
 	ConvertPointCloud(*in_no_ground_cloud, output_gridmap.getFrameId(), *final_no_ground_cloud);
 
 	//organize pointcloud in cylindrical coords
-	PointCloudXYZIRTColor organized_points;
-	std::vector<pcl::PointIndices> radial_division_indices;
+	PointCloudXYZIRTColor organized_points;			// 保存了转换后的点
+	std::vector<pcl::PointIndices> radial_division_indices;		// 共3600个元素，保存点的索引，分配到3600个扇区里
 	std::vector<pcl::PointIndices> closest_indices;
-	std::vector<PointCloudXYZIRTColor> radial_ordered_clouds;
+	std::vector<PointCloudXYZIRTColor> radial_ordered_clouds;	// 共3600个元素，也有保存转换后的点，分配到3600个扇区里，与上面保存的索引一一对应
 
-	ConvertXYZIToRTZ(final_ground_cloud,
+	ConvertXYZIToRTZ(final_ground_cloud,		// 转到RTZ中柱坐标
 	                 organized_points,
 	                 radial_division_indices,
 	                 radial_ordered_clouds);
 
 	//draw lines between initial and last point of each ray
-	for (size_t i = 0; i < radial_ordered_clouds.size(); i++)//sweep through each radial division
+	for (size_t i = 0; i < radial_ordered_clouds.size(); i++)//sweep through each radial division,已经按距离原点坐标远近排序
 	{
 		geometry_msgs::Point prev_point;
 		for (size_t j = 0; j < radial_ordered_clouds[i].size(); j++)//loop through each point
@@ -251,7 +251,7 @@ void ROSRoadOccupancyProcessorApp::PointsCallback(const sensor_msgs::PointCloud2
 			current_point.y = radial_ordered_clouds[i][j].point.y;
 			current_point.z = radial_ordered_clouds[i][j].point.z;
 
-			DrawLineInGridMap(output_gridmap, current_road_mat, prev_point, current_point, OCCUPANCY_ROAD_FREE);
+			DrawLineInGridMap(output_gridmap, current_road_mat, prev_point, current_point, OCCUPANCY_ROAD_FREE);	// 画线
 		}
 	}
 
@@ -262,11 +262,11 @@ void ROSRoadOccupancyProcessorApp::PointsCallback(const sensor_msgs::PointCloud2
 		sensor_point.x = point.x;
 		sensor_point.y = point.y;
 		sensor_point.z = point.z;
-		SetPointInGridMap(output_gridmap, current_road_mat, sensor_point, OCCUPANCY_ROAD_OCCUPIED);
+		SetPointInGridMap(output_gridmap, current_road_mat, sensor_point, OCCUPANCY_ROAD_OCCUPIED);	// 以point画小圆并填充，表示障碍物
 	}
 
 #pragma omp for
-	for(int row = 0; row < current_road_mat.rows; row++)
+	for(int row = 0; row < current_road_mat.rows; row++)		// 猜测是为了消除因前面的填充，导致原有的no_road被修改，所以重新修正一下
 	{
 		for(int col = 0; col < current_road_mat.cols; col++)
 		{
@@ -321,7 +321,7 @@ void ROSRoadOccupancyProcessorApp::InitializeROSIo(ros::NodeHandle &in_private_h
 	in_private_handle.param<int>("no_road_value", OCCUPANCY_NO_ROAD, 255);
 	ROS_INFO("[%s] no_road_value: %d",__APP_NAME__, OCCUPANCY_NO_ROAD);
 
-	//generate subscribers and sychronizers
+	//generate subscribers and sychronizers		// 要同步的两个话题数据
 	cloud_ground_subscriber_ = new message_filters::Subscriber<sensor_msgs::PointCloud2>(node_handle_,
 	                                                                                     points_ground_topic_str, 1);
 	ROS_INFO("[%s] Subscribing to... %s",__APP_NAME__, points_ground_topic_str.c_str());
@@ -332,18 +332,18 @@ void ROSRoadOccupancyProcessorApp::InitializeROSIo(ros::NodeHandle &in_private_h
 	/*gridmap_subscriber_ = new message_filters::Subscriber<grid_map_msgs::GridMap>(node_handle_,
 	                                                                              wayarea_topic_str, 1);
 	gridmap_subscriber_->registerCallback(boost::bind(&ROSRoadOccupancyProcessorApp::PointsCallback, this));*/
-	gridmap_subscriber_ = node_handle_.subscribe(wayarea_topic_str, 10,
+	gridmap_subscriber_ = node_handle_.subscribe(wayarea_topic_str, 10,		// 订阅wayarea_topic_str话题
 	                                                             &ROSRoadOccupancyProcessorApp::GridMapCallback, this);
 	ROS_INFO("[%s] Subscribing to... %s",__APP_NAME__, wayarea_topic_str.c_str());
 
 	cloud_synchronizer_ =
 			new message_filters::Synchronizer<SyncPolicyT>(SyncPolicyT(100),
-			                                               *cloud_ground_subscriber_,
+			                                               *cloud_ground_subscriber_,			// 同步这两个话题数据,在PointsCallback中处理
 			                                               *cloud_no_ground_subscriber_);
 	cloud_synchronizer_->registerCallback(boost::bind(&ROSRoadOccupancyProcessorApp::PointsCallback, this, _1, _2));
 
 	//register publishers
-	publisher_grid_map_= node_handle_.advertise<grid_map_msgs::GridMap>("gridmap_road_status", 1);
+	publisher_grid_map_= node_handle_.advertise<grid_map_msgs::GridMap>("gridmap_road_status", 1);		// 声明两个话题
 	ROS_INFO("[%s] Publishing GridMap in gridmap_road_status",__APP_NAME__);
 
 	publisher_occupancy_grid_ = node_handle_.advertise<nav_msgs::OccupancyGrid>("occupancy_road_status", 1);

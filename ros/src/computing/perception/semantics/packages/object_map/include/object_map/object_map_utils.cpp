@@ -23,11 +23,11 @@ namespace object_map
 	geometry_msgs::Point TransformPoint(const geometry_msgs::Point &in_point, const tf::Transform &in_tf)
 	{
 		tf::Point tf_point;
-		tf::pointMsgToTF(in_point, tf_point);
+		tf::pointMsgToTF(in_point, tf_point);	// msg类型的点转成tf的点
 
-		tf_point = in_tf * tf_point;
+		tf_point = in_tf * tf_point;		// 变换
 
-		geometry_msgs::Point out_point;
+		geometry_msgs::Point out_point;			// 转会msg类型的点
 		tf::pointTFToMsg(tf_point, out_point);
 
 		return out_point;
@@ -71,7 +71,7 @@ namespace object_map
 	}
 
 	std::vector<geometry_msgs::Point>
-	SearchAreaPoints(const vector_map::Area &in_area, const vector_map::VectorMap &in_vectormap)
+	SearchAreaPoints(const vector_map::Area &in_area, const vector_map::VectorMap &in_vectormap)	// 从这个area出发，从线找到点
 	{
 		std::vector<geometry_msgs::Point> area_points;
 		std::vector<geometry_msgs::Point> area_points_empty;
@@ -125,7 +125,7 @@ namespace object_map
 		{
 			out_grid_map.add(in_grid_layer_name);
 		}
-		out_grid_map[in_grid_layer_name].setConstant(in_layer_background_value);
+		out_grid_map[in_grid_layer_name].setConstant(in_layer_background_value);		// 初始化GridMap
 
 		cv::Mat original_image;
 		grid_map::GridMapCvConverter::toImage<unsigned char, 1>(out_grid_map,
@@ -137,18 +137,18 @@ namespace object_map
 
 		cv::Mat filled_image = original_image.clone();
 
-		tf::StampedTransform tf = FindTransform(in_tf_target_frame, in_tf_source_frame, in_tf_listener);
+		tf::StampedTransform tf = FindTransform(in_tf_target_frame, in_tf_source_frame, in_tf_listener);	// 获得从map到lidar的tf
 
 		// calculate out_grid_map position
-		grid_map::Position map_pos = out_grid_map.getPosition();
+		grid_map::Position map_pos = out_grid_map.getPosition();	// 得到out_grid_map的中心点坐标
 		double origin_x_offset = out_grid_map.getLength().x() / 2.0 - map_pos.x();
 		double origin_y_offset = out_grid_map.getLength().y() / 2.0 - map_pos.y();
 
-		for (const auto &points : in_area_points)
+		for (const auto &points : in_area_points)		// 多条路的area
 		{
 			std::vector<cv::Point> cv_points;
 
-			for (const auto &p : points)
+			for (const auto &p : points)		// 一个area
 			{
 				// transform to GridMap coordinate
 				geometry_msgs::Point tf_point = TransformPoint(p, tf);
@@ -159,7 +159,8 @@ namespace object_map
 				cv_points.emplace_back(cv::Point(cv_x, cv_y));
 			}
 
-			cv::fillConvexPoly(filled_image, cv_points.data(), cv_points.size(), cv::Scalar(in_fill_color));
+			// 根据顶点绘制多边形，返回到filled_image，顶点指针，顶点个数，颜色
+			cv::fillConvexPoly(filled_image, cv_points.data(), cv_points.size(), cv::Scalar(in_fill_color));	
 		}
 
 		// convert to ROS msg
