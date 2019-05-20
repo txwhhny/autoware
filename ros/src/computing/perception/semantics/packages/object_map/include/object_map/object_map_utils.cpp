@@ -160,7 +160,7 @@ namespace object_map
 			}
 
 			// 根据顶点绘制多边形，返回到filled_image，顶点指针，顶点个数，颜色
-			cv::fillConvexPoly(filled_image, cv_points.data(), cv_points.size(), cv::Scalar(in_fill_color));	
+			cv::fillConvexPoly(filled_image, cv_points.data(), cv_points.size(), cv::Scalar(in_fill_color));		// in_fill_color==0,所以是黑色，黑色可通行
 		}
 
 		// convert to ROS msg

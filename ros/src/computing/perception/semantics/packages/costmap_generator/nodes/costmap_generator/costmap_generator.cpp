@@ -73,8 +73,8 @@ void CostmapGenerator::init()
 
 void CostmapGenerator::run()
 {
-  pub_costmap_ = nh_.advertise<grid_map_msgs::GridMap>("/semantics/costmap", 1);
-  pub_occupancy_grid_ = nh_.advertise<nav_msgs::OccupancyGrid>("/semantics/costmap_generator/occupancy_grid", 1);
+  pub_costmap_ = nh_.advertise<grid_map_msgs::GridMap>("/semantics/costmap", 1);    // 发布整个地图（多层）？
+  pub_occupancy_grid_ = nh_.advertise<nav_msgs::OccupancyGrid>("/semantics/costmap_generator/occupancy_grid", 1);   // 发布一层？
 
   if (use_objects_box_ || use_objects_convex_hull_)
   {

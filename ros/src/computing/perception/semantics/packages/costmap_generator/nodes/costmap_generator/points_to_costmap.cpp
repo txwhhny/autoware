@@ -70,7 +70,7 @@ grid_map::Index PointsToCostmap::fetchGridIndexFromPoint(const pcl::PointXYZ& po
   double mapped_x = (grid_length_x_ - origin_x_offset - point.x) / grid_resolution_;
   double mapped_y = (grid_length_y_ - origin_y_offset - point.y) / grid_resolution_;  
 
-  int mapped_x_ind = std::ceil(mapped_x);   // 如何保证这两个值都是 >= 0 ????
+  int mapped_x_ind = std::ceil(mapped_x);   // 之后利用isValidInd判断有效性
   int mapped_y_ind = std::ceil(mapped_y);
   grid_map::Index index(mapped_x_ind, mapped_y_ind);
   return index;
@@ -107,7 +107,7 @@ grid_map::Matrix PointsToCostmap::calculateCostmap(const double maximum_height_t
   {
     for (size_t y_ind = 0; y_ind < grid_vec[0].size(); y_ind++)
     {
-      if (grid_vec[x_ind][y_ind].size() == 0)     // 这个cell没有点，则赋值grid_min_value
+      if (grid_vec[x_ind][y_ind].size() == 0)     // 这个cell没有点，则赋值grid_min_value,默认值貌似也是grid_min_value
       {
         gridmap_data(x_ind, y_ind) = grid_min_value;
         continue;
