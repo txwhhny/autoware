@@ -88,7 +88,7 @@ std::vector<std::vector<std::vector<double>>> PointsToCostmap::assignPoints2Grid
   for (const auto& point : *in_sensor_points)
   {
     grid_map::Index grid_ind = fetchGridIndexFromPoint(point);
-    if (isValidInd(grid_ind))
+    if (isValidInd(grid_ind))   // 判断grid_ind的有效性
     {
       vec_x_y_z[grid_ind.x()][grid_ind.y()].push_back(point.z);
     }
