@@ -47,6 +47,7 @@ void WaypointLoaderNode::run()
   ros::spin();
 }
 
+// 依次处理多个.csv文件,读取成多个lane
 void WaypointLoaderNode::createLaneArray(const std::vector<std::string>& paths, autoware_msgs::LaneArray* lane_array)
 {
   for (const auto& el : paths)
@@ -57,6 +58,7 @@ void WaypointLoaderNode::createLaneArray(const std::vector<std::string>& paths, 
   }
 }
 
+// 根据文件名,把里面的航点读出,组织成一个lane
 void WaypointLoaderNode::createLaneWaypoint(const std::string& file_path, autoware_msgs::Lane* lane)
 {
   if (!verifyFileConsistency(file_path.c_str()))
@@ -163,6 +165,7 @@ void WaypointLoaderNode::parseWaypointForVer2(const std::string& line, autoware_
   wp->twist.twist.linear.x = kmph2mps(std::stod(columns[4]));
 }
 
+// 根据文件获取该文件的所有航点
 void WaypointLoaderNode::loadWaypointsForVer3(const char* filename, std::vector<autoware_msgs::Waypoint>* wps)
 {
   std::ifstream ifs(filename);
@@ -186,6 +189,7 @@ void WaypointLoaderNode::loadWaypointsForVer3(const char* filename, std::vector<
   }
 }
 
+// 根据标题读取对应列的数据, 依次处理各数据行, 转换成waypoint
 void WaypointLoaderNode::parseWaypointForVer3(const std::string& line, const std::vector<std::string>& contents,
                                               autoware_msgs::Waypoint* wp)
 {
@@ -209,6 +213,7 @@ void WaypointLoaderNode::parseWaypointForVer3(const std::string& line, const std
   wp->wpstate.event_state = (map.find("event_flag") != map.end()) ? std::stoi(map["event_flag"]) : 0;
 }
 
+// 获取文件的数据组织格式
 FileFormat WaypointLoaderNode::checkFileFormat(const char* filename)
 {
   std::ifstream ifs(filename);
@@ -243,6 +248,7 @@ FileFormat WaypointLoaderNode::checkFileFormat(const char* filename)
                                                       FileFormat::unknown);
 }
 
+// 验证文件格式是否正确, 验证各数据行的列数是否和标题行列数一致(ver3格式)
 bool WaypointLoaderNode::verifyFileConsistency(const char* filename)
 {
   ROS_INFO("verify...");
@@ -280,6 +286,7 @@ bool WaypointLoaderNode::verifyFileConsistency(const char* filename)
   return true;
 }
 
+// 以","为分界符, 将line分割成多个string放入columns中
 void parseColumns(const std::string& line, std::vector<std::string>* columns)
 {
   std::istringstream ss(line);
@@ -302,6 +309,7 @@ void parseColumns(const std::string& line, std::vector<std::string>* columns)
   }
 }
 
+// 以","为分界符, 计算line有多少列
 size_t countColumns(const std::string& line)
 {
   std::istringstream ss(line);
