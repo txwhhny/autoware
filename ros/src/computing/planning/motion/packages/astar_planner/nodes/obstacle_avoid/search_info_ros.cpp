@@ -44,6 +44,7 @@ SearchInfo::~SearchInfo()
 {
 }
 
+// 在lane的航点中, 计算起点到目标点的路径长度
 double SearchInfo::calcPathLength(const autoware_msgs::Lane &lane, const int start_waypoint_index,
                                   const int goal_waypoint_index) const
 {
@@ -64,18 +65,19 @@ double SearchInfo::calcPathLength(const autoware_msgs::Lane &lane, const int sta
   return dist_sum;
 }
 
+// 保存ogm, 同时计算该msg下的ogm_to_map的tf, 注意ogm可能会有多个, 该回调函数每次被调用,只要ogm变化, 则ogm_to_map也相应变化.
 void SearchInfo::mapCallback(const nav_msgs::OccupancyGridConstPtr &msg)
 {
   map_ = *msg;
 
-  std::string map_frame = map_frame_;
+  std::string map_frame = map_frame_;   // 默认值 = "map"
   std::string ogm_frame = msg->header.frame_id;
 
   // Set transform between map frame and OccupancyGrid frame
   tf::StampedTransform map2ogm_frame;
   try
   {
-    tf_listener_.lookupTransform(map_frame, ogm_frame, ros::Time(0), map2ogm_frame);
+    tf_listener_.lookupTransform(map_frame, ogm_frame, ros::Time(0), map2ogm_frame); // 获取map_to_ogm的tf
   }
   catch (tf::TransformException ex)
   {
@@ -85,9 +87,9 @@ void SearchInfo::mapCallback(const nav_msgs::OccupancyGridConstPtr &msg)
 
   // Set transform between map frame and the origin of OccupancyGrid
   tf::Transform map2ogm;
-  geometry_msgs::Pose ogm_in_map = astar_planner::transformPose(map_.info.origin, map2ogm_frame);
+  geometry_msgs::Pose ogm_in_map = astar_planner::transformPose(map_.info.origin, map2ogm_frame);   // 把msg的原点变换到"map"坐标系下
   tf::poseMsgToTF(ogm_in_map, map2ogm);
-  ogm2map_ = map2ogm.inverse();
+  ogm2map_ = map2ogm.inverse();   // 得到ogm_to_map的tf, 这个tf不等于map2ogm_frame的逆, 原因是map_.info.origin与ogm_frame的原点不一定重合.
 
   map_set_ = true;
 }
@@ -104,6 +106,7 @@ void SearchInfo::currentVelocityCallback(const geometry_msgs::TwistStampedConstP
   current_velocity_mps_ = msg->twist.linear.x;
 }
 
+// 转换goal和current(也就是start)到map,ogm坐标系下
 void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 {
   if (!map_set_)
@@ -118,7 +121,7 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   tf::StampedTransform map2world;
   try
   {
-    tf_listener_.lookupTransform(map_frame, goal_frame, ros::Time(0), map2world);
+    tf_listener_.lookupTransform(map_frame, goal_frame, ros::Time(0), map2world);   // goal_frame是world? 也就是msg是world坐标系下的
   }
   catch (tf::TransformException ex)
   {
@@ -128,10 +131,10 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 
   // Set goal pose
   geometry_msgs::Pose pose_msg = msg->pose;
-  goal_pose_global_.pose = astar_planner::transformPose(pose_msg, map2world);
-  goal_pose_global_.header = msg->header;
-  goal_pose_local_.pose = astar_planner::transformPose(goal_pose_global_.pose, ogm2map_);
-  goal_pose_local_.header = goal_pose_global_.header;
+  goal_pose_global_.pose = astar_planner::transformPose(pose_msg, map2world);   // 转成map坐标系下的pose
+  goal_pose_global_.header = msg->header;   // 为何frame_id还是用的msg的,也就是"world"?
+  goal_pose_local_.pose = astar_planner::transformPose(goal_pose_global_.pose, ogm2map_); // 再转成ogm坐标系下的pose
+  goal_pose_local_.header = goal_pose_global_.header; // 为何frame_id还是用的msg的,也就是"world"?
 
   goal_set_ = true;
 
@@ -149,9 +152,9 @@ void SearchInfo::goalCallback(const geometry_msgs::PoseStampedConstPtr &msg)
   }
 
   // Set start pose
-  start_pose_global_.pose = astar_planner::transformPose(current_pose_.pose, map2start_frame);
-  start_pose_global_.header = current_pose_.header;
-  start_pose_local_.pose = astar_planner::transformPose(start_pose_global_.pose, ogm2map_);
+  start_pose_global_.pose = astar_planner::transformPose(current_pose_.pose, map2start_frame);    // 转成map坐标系下的current
+  start_pose_global_.header = current_pose_.header;               // frame_id疑问同上
+  start_pose_local_.pose = astar_planner::transformPose(start_pose_global_.pose, ogm2map_);       // 转成ogm坐标系下的current
   start_pose_local_.header = start_pose_global_.header;
 
   start_set_ = true;
@@ -174,7 +177,7 @@ void SearchInfo::closestWaypointCallback(const std_msgs::Int32ConstPtr &msg)
   closest_waypoint_index_ = msg->data;
 }
 
-void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)
+void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)   // msg->data为什么是local index
 {
   // not always avoid AND current state is not avoidance
   if (!avoidance_ && state_ != "OBSTACLE_AVOIDANCE")
@@ -192,7 +195,7 @@ void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)
   // msg->data : local index
   // closest   : global index
   // Conver local index to global index
-  obstacle_waypoint_index_ = msg->data + closest_waypoint_index_;
+  obstacle_waypoint_index_ = msg->data + closest_waypoint_index_; // 因为waypoints的坐标是map下的,所以index也应该是对应map下的,但是为何这就转成的global???
 
   // Handle when detecting sensor noise as an obstacle
   static int prev_obstacle_waypoint_index = -1;
@@ -205,12 +208,12 @@ void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)
   }
   else
   {
-    obstacle_count = 1;
+    obstacle_count = 1;   // 1表示100ms
   }
 
   prev_obstacle_waypoint_index = obstacle_waypoint_index_;
 
-  if (obstacle_count < obstacle_detect_count_)
+  if (obstacle_count < obstacle_detect_count_)    // 障碍物是否持续obstacle_detect_count_(1s)
     return;
 
   // not debug mode
@@ -218,7 +221,7 @@ void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)
     obstacle_count = 0;
 
   // Decide start and goal waypoints for planning
-  start_waypoint_index_ = obstacle_waypoint_index_ - avoid_distance_;
+  start_waypoint_index_ = obstacle_waypoint_index_ - avoid_distance_;   // 确认了障碍物后, 计算起始点和目标点, avoid_distance_航点数量
   goal_waypoint_index_ = obstacle_waypoint_index_ + avoid_distance_;
 
   // Handle out of range
@@ -233,7 +236,7 @@ void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)
   upper_bound_distance_ = original_path_length * upper_bound_ratio_;
 
   // Do not avoid if (the obstacle is too close || current velocity is too fast)
-  if (closest_waypoint_index_ + 1 > start_waypoint_index_)
+  if (closest_waypoint_index_ + 1 > start_waypoint_index_)    // 最接近的航点已经处于障碍物范围内(start_waypoint_index_ ~ goal_waypoint_index_之间)
   {
     ROS_WARN("The obstacle is too close!");
     return;
@@ -247,7 +250,7 @@ void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)
   }
 
   // Set start pose
-  start_pose_global_ = current_waypoints_.waypoints[start_waypoint_index_].pose;
+  start_pose_global_ = current_waypoints_.waypoints[start_waypoint_index_].pose;      // 把map下的pose转到ogm, 也就是global->local
   start_pose_local_.pose = astar_planner::transformPose(start_pose_global_.pose, ogm2map_);
   start_set_ = true;
 
@@ -256,17 +259,17 @@ void SearchInfo::obstacleWaypointCallback(const std_msgs::Int32ConstPtr &msg)
   double actual_car_width = 2.5;  // [m]
   geometry_msgs::Pose relative_transit_pose;
   // TODO: always right avoidance ???
-  relative_transit_pose.position.y -= actual_car_width;
+  relative_transit_pose.position.y -= actual_car_width;   // relative_transit_pose.position.y = -2.5; 相当于以obstacl航点为原点的坐标系表示,其实应该等效于relative_transit_pose.position.y = current_waypoints_.waypoints[obstacle_waypoint_index_].pose.pose - 2.5
   relative_transit_pose.orientation = current_waypoints_.waypoints[obstacle_waypoint_index_].pose.pose.orientation;
-  tf::Pose obstacle_pose_tf;
-  tf::poseMsgToTF(current_waypoints_.waypoints[obstacle_waypoint_index_].pose.pose, obstacle_pose_tf);
+  tf::Pose obstacle_pose_tf;    
+  tf::poseMsgToTF(current_waypoints_.waypoints[obstacle_waypoint_index_].pose.pose, obstacle_pose_tf);  // 相当于 map_to_obstacle的tf
 
-  transit_pose_global_.pose = astar_planner::transformPose(relative_transit_pose, obstacle_pose_tf);
-  transit_pose_local_.pose = astar_planner::transformPose(transit_pose_global_.pose, ogm2map_);
+  transit_pose_global_.pose = astar_planner::transformPose(relative_transit_pose, obstacle_pose_tf);    // 转成map坐标系下的pose
+  transit_pose_local_.pose = astar_planner::transformPose(transit_pose_global_.pose, ogm2map_);         // 转成ogm坐标系下的pose
 
   // Set goal pose
   goal_pose_global_ = current_waypoints_.waypoints[goal_waypoint_index_].pose;
-  goal_pose_local_.pose = astar_planner::transformPose(goal_pose_global_.pose, ogm2map_);
+  goal_pose_local_.pose = astar_planner::transformPose(goal_pose_global_.pose, ogm2map_);   // goal转成local下的pose
 
   goal_set_ = true;
 }

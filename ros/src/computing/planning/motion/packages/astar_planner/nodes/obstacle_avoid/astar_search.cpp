@@ -66,6 +66,7 @@ void AstarSearch::initializeNode(const nav_msgs::OccupancyGrid &map)
   node_initialized_ = true;
 }
 
+// 根据pose,计算在gridmap中的idx, idy, idtheta.
 void AstarSearch::poseToIndex(const geometry_msgs::Pose &pose, int *index_x, int *index_y, int *index_theta)
 {
   *index_x = pose.position.x / map_info_.resolution;
@@ -97,7 +98,7 @@ void AstarSearch::createStateUpdateTableLocal(int angle_size)
 
   // Minimum moving distance with one state update
   //     arc  = r                       * theta
-  double step = minimum_turning_radius_ * (2.0 * M_PI / angle_size_);
+  double step = minimum_turning_radius_ * (2.0 * M_PI / angle_size_);   // 最小转弯半径*角度分辨率,即弧长
 
   for (int i = 0; i < angle_size; i++)
   {
@@ -106,16 +107,16 @@ void AstarSearch::createStateUpdateTableLocal(int angle_size)
 
     // Calculate right and left circle
     // Robot moves along these circles
-    double right_circle_center_x = minimum_turning_radius_ * std::sin(robot_angle);
+    double right_circle_center_x = minimum_turning_radius_ * std::sin(robot_angle);         // 右转时,在最小转弯半径下的圆心坐标
     double right_circle_center_y = minimum_turning_radius_ * std::cos(robot_angle) * -1.0;
-    double left_circle_center_x = right_circle_center_x * -1.0;
+    double left_circle_center_x = right_circle_center_x * -1.0;   // 左转时,在最小转弯半径下的圆心坐标
     double left_circle_center_y = right_circle_center_y * -1.0;
 
     NodeUpdate nu;
 
     // Calculate x and y shift to next state
     // forward
-    nu.shift_x = step * std::cos(robot_angle);
+    nu.shift_x = step * std::cos(robot_angle);    // 按角度分辨率,设置每个角度在最小转弯半径下,各个角度相应的x,y增量
     nu.shift_y = step * std::sin(robot_angle);
     nu.rotation = 0;
     nu.index_theta = 0;
@@ -150,7 +151,7 @@ void AstarSearch::createStateUpdateTableLocal(int angle_size)
     state_update_table_[i].emplace_back(nu);
     */
 
-    // forward right medium
+    // forward right medium     // 按角度分辨率,设置每个角度在两倍最小转弯半径下,各个角度相应的x,y增量
     nu.shift_x =
         right_circle_center_x * 2 + minimum_turning_radius_ * 2 * std::cos(M_PI_2 + robot_angle - descretized_angle);
     nu.shift_y =
@@ -282,7 +283,7 @@ void AstarSearch::setPath(const SimpleNode &goal)
 
 // Check if the next state is the goal
 // Check lateral offset, longitudinal offset and angle
-bool AstarSearch::isGoal(double x, double y, double theta)
+bool AstarSearch::isGoal(double x, double y, double theta)  // 是否已经到达目标点
 {
   // To reduce computation time, we use square value for distance
   static const double lateral_goal_range =
@@ -293,7 +294,7 @@ bool AstarSearch::isGoal(double x, double y, double theta)
 
   // Calculate the node coordinate seen from the goal point
   tf::Point p(x, y, 0);
-  geometry_msgs::Point relative_node_point = astar_planner::calcRelativeCoordinate(goal_pose_local_.pose, p);
+  geometry_msgs::Point relative_node_point = astar_planner::calcRelativeCoordinate(goal_pose_local_.pose, p);   // gridmap坐标系下的点,转到pose坐标系下的点
 
   // Check Pose of goal
   if (relative_node_point.x < 0 &&  // shoud be behind of goal
@@ -315,8 +316,8 @@ bool AstarSearch::isObs(int index_x, int index_y)
 
   return false;
 }
-
-bool AstarSearch::detectCollision(const SimpleNode &sn)
+// 碰撞检测
+bool AstarSearch::detectCollision(const SimpleNode &sn)   // 根据车的矩形,进行航向旋转后,计算矩形范围内的障碍物状况,即碰撞检测
 {
   // Define the robot as rectangle
   static double left = -1.0 * base2back_;
@@ -341,12 +342,12 @@ bool AstarSearch::detectCollision(const SimpleNode &sn)
     for (double y = top; y > bottom; y -= resolution)
     {
       // 2D point rotation
-      int index_x = (x * cos_theta - y * sin_theta + base_x) / resolution;
+      int index_x = (x * cos_theta - y * sin_theta + base_x) / resolution;      // 这是个旋转矩阵运算, 从base坐标系下转到map,之所以直接除resolution,因为gridmap和map坐标原点重合,轴向重合?
       int index_y = (x * sin_theta + y * cos_theta + base_y) / resolution;
 
       if (isOutOfRange(index_x, index_y))
         return true;
-      if (nodes_[index_y][index_x][0].status == STATUS::OBS)
+      if (nodes_[index_y][index_x][0].status == STATUS::OBS)    // 如果车体矩形范围内的node存在节点的为OBS状态,则表示碰撞发生
         return true;
     }
   }
@@ -366,7 +367,7 @@ bool AstarSearch::calcWaveFrontHeuristic(const SimpleNode &sn)
   // State update table for wavefront search
   // Nodes are expanded for each neighborhood cells (moore neighborhood)
   double resolution = map_info_.resolution;
-  static std::vector<WaveFrontNode> updates = {
+  static std::vector<WaveFrontNode> updates = {   // 周围的8个点
     astar_planner::getWaveFrontNode(0, 1, resolution), astar_planner::getWaveFrontNode(-1, 0, resolution),
     astar_planner::getWaveFrontNode(1, 0, resolution), astar_planner::getWaveFrontNode(0, -1, resolution),
     astar_planner::getWaveFrontNode(-1, 1, std::hypot(resolution, resolution)),
@@ -391,18 +392,18 @@ bool AstarSearch::calcWaveFrontHeuristic(const SimpleNode &sn)
     qu.pop();
 
     WaveFrontNode next;
-    for (const auto &u : updates)
+    for (const auto &u : updates)   // 依次处理ref周围的8个点
     {
       next.index_x = ref.index_x + u.index_x;
       next.index_y = ref.index_y + u.index_y;
 
-      // out of range OR already visited OR obstacle node
+      // out of range OR already visited OR obstacle node   // hc > 0表示已经处理过了
       if (isOutOfRange(next.index_x, next.index_y) || nodes_[next.index_y][next.index_x][0].hc > 0 ||
           nodes_[next.index_y][next.index_x][0].status == STATUS::OBS)
         continue;
 
       // Take the size of robot into account
-      if (detectCollisionWaveFront(next))
+      if (detectCollisionWaveFront(next))   // 根据机器人的宽度,进行碰撞检测
         continue;
 
       // Check if we can reach from start to goal
@@ -422,7 +423,7 @@ bool AstarSearch::calcWaveFrontHeuristic(const SimpleNode &sn)
 }
 
 // Simple collidion detection for wavefront search
-bool AstarSearch::detectCollisionWaveFront(const WaveFrontNode &ref)
+bool AstarSearch::detectCollisionWaveFront(const WaveFrontNode &ref)    // 根据车的宽度,以ref为中心的矩形进行障碍物检测
 {
   // Define the robot as square
   static double half = robot_width_ / 2;
@@ -496,7 +497,7 @@ void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
   }
 
   tf::Transform map2ogm;
-  geometry_msgs::Pose ogm_in_map = astar_planner::transformPose(map_info_.origin, map2ogm_frame);
+  geometry_msgs::Pose ogm_in_map = astar_planner::transformPose(map_info_.origin, map2ogm_frame); // 把ogm的原点转到map坐标系下
   tf::poseMsgToTF(ogm_in_map, map2ogm_);
 
   for (size_t i = 0; i < map.info.height; i++)
@@ -515,10 +516,10 @@ void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
       {
         // the cost more than threshold is regarded almost same as an obstacle
         // because of its very high cost
-        if (cost > obstacle_threshold_)
+        if (cost > obstacle_threshold_)       // cost超过障碍物表示值,则设置为OBS
           nodes_[i][j][0].status = STATUS::OBS;
         else
-          nodes_[i][j][0].hc = cost * potential_weight_;
+          nodes_[i][j][0].hc = cost * potential_weight_;  // cost * 10权重?
       }
 
       // obstacle or unknown area
@@ -527,14 +528,14 @@ void AstarSearch::setMap(const nav_msgs::OccupancyGrid &map)
     }
   }
 }
-
+// 初始化起点, 放到开放列表中
 bool AstarSearch::setStartNode()
 {
   // Get index of start pose
   int index_x;
   int index_y;
   int index_theta;
-  poseToIndex(start_pose_local_.pose, &index_x, &index_y, &index_theta);
+  poseToIndex(start_pose_local_.pose, &index_x, &index_y, &index_theta);  // 根据pose,获得在gridmap中的idx_x,idx_y,idx_theta
   SimpleNode start_sn(index_x, index_y, index_theta, 0, 0);
 
   // Check if start is valid
@@ -546,7 +547,7 @@ bool AstarSearch::setStartNode()
   start_node.x = start_pose_local_.pose.position.x;
   start_node.y = start_pose_local_.pose.position.y;
   start_node.theta = 2.0 * M_PI / angle_size_ * index_theta;
-  start_node.gc = 0;
+  start_node.gc = 0;  // 从起点算起的代价
   start_node.move_distance = 0;
   start_node.back = false;
   start_node.status = STATUS::OPEN;
@@ -574,7 +575,7 @@ bool AstarSearch::setStartNode()
 
 bool AstarSearch::setGoalNode()
 {
-  goal_yaw_ = astar_planner::modifyTheta(tf::getYaw(goal_pose_local_.pose.orientation));
+  goal_yaw_ = astar_planner::modifyTheta(tf::getYaw(goal_pose_local_.pose.orientation));  // 改到0~2pi之间
 
   // Get index of goal pose
   int index_x;
@@ -583,13 +584,13 @@ bool AstarSearch::setGoalNode()
   poseToIndex(goal_pose_local_.pose, &index_x, &index_y, &index_theta);
 
   debug_poses_.header.frame_id = map_frame_;
-  debug_poses_.poses.push_back(astar_planner::transformPose(goal_pose_local_.pose, map2ogm_));
+  debug_poses_.poses.push_back(astar_planner::transformPose(goal_pose_local_.pose, map2ogm_)); // 变换到map坐标系下
   debug_pose_pub_.publish(debug_poses_);
 
   SimpleNode goal_sn(index_x, index_y, index_theta, 0, 0);
 
   // Check if goal is valid
-  if (isOutOfRange(index_x, index_y) || detectCollision(goal_sn))
+  if (isOutOfRange(index_x, index_y) || detectCollision(goal_sn))   // 越界与碰撞检测
     return false;
 
   // Make multiple cells goals
@@ -643,7 +644,7 @@ bool AstarSearch::search()
     current_node->status = STATUS::CLOSED;
 
     // Goal check
-    if (isGoal(current_node->x, current_node->y, current_node->theta))
+    if (isGoal(current_node->x, current_node->y, current_node->theta))    // node_中的x, y等成员变量是在什么时候赋值的
     {
       ROS_INFO("Search time: %lf [msec]", (timer_end - timer_begin).toSec() * 1000.0);
 
@@ -654,7 +655,7 @@ bool AstarSearch::search()
     if (publish_marker_)
     {
       geometry_msgs::Pose p = astar_planner::xytToPoseMsg(current_node->x, current_node->y, current_node->theta);
-      p = astar_planner::transformPose(p, map2ogm_);
+      p = astar_planner::transformPose(p, map2ogm_);    // gridmap坐标系下的点,转到map
       debug_poses_.poses.push_back(p);
     }
 
@@ -760,7 +761,7 @@ bool AstarSearch::search()
 bool AstarSearch::makePlan(const geometry_msgs::Pose &start_pose, const geometry_msgs::Pose &goal_pose,
                            const nav_msgs::OccupancyGrid &map, double upper_bound_distance)
 {
-  start_pose_local_.pose = start_pose;
+  start_pose_local_.pose = start_pose;    // ogm坐标系下的点
   goal_pose_local_.pose = goal_pose;
   upper_bound_distance_ = upper_bound_distance;
 

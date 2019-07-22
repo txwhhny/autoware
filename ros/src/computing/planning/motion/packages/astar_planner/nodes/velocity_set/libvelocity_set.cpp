@@ -6,16 +6,16 @@ std::vector<geometry_msgs::Point> removeNeedlessPoints(std::vector<geometry_msgs
   area_points.push_back(area_points.front());
   std::map<double, int> length_index;
   for (unsigned int i = 0; i < area_points.size() - 1; i++)
-    length_index[calcSquareOfLength(area_points[i], area_points[i + 1])] = i;
+    length_index[calcSquareOfLength(area_points[i], area_points[i + 1])] = i;   // 计算两个点的三维空间距离,作为key,i作为value
 
   std::vector<geometry_msgs::Point> new_points;
-  auto it = length_index.end();
-  int first = (--it)->second;
-  int second = (--it)->second;
+  auto it = length_index.end();                 // map会自动按key从小到达排序
+  int first = (--it)->second;                   // 距离最大的两个点的较小的索引值
+  int second = (--it)->second;                  // 距离第二大的两个点的较小的索引值
   new_points.push_back(area_points[first]);
   new_points.push_back(area_points[first + 1]);
   new_points.push_back(area_points[second]);
-  new_points.push_back(area_points[second + 1]);
+  new_points.push_back(area_points[second + 1]);  // 取出距离最大的和第二大的四个点
 
   return new_points;
 }
@@ -86,7 +86,7 @@ geometry_msgs::Point CrossWalk::getPoint(const int &pid) const
   return point;
 }
 
-geometry_msgs::Point CrossWalk::calcCenterofGravity(const int &aid) const
+geometry_msgs::Point CrossWalk::calcCenterofGravity(const int &aid) const     // 计算质心的坐标, 
 {
   int search_lid = -1;
   for (const auto &area : area_.data)
@@ -139,7 +139,7 @@ geometry_msgs::Point CrossWalk::calcCenterofGravity(const int &aid) const
   return point;
 }
 
-double CrossWalk::calcCrossWalkWidth(const int &aid) const
+double CrossWalk::calcCrossWalkWidth(const int &aid) const    // 计算最长的一条线的距离
 {
   int search_lid = -1;
   for (const auto &area : area_.data)
@@ -156,9 +156,9 @@ double CrossWalk::calcCrossWalkWidth(const int &aid) const
     {
       if (line.lid == search_lid)
       {
-        area_points.push_back(getPoint(line.bpid));
+        area_points.push_back(getPoint(line.bpid));   // 依次保存该area的线的起点(因为前面线的终点是后面线的起点)
         //_points.push_back(area_points.back());///
-        search_lid = line.flid;
+        search_lid = line.flid;   // 最后一条线的时候, 它的flid是0, 也就是while的退出条件
       }
     }
   }
@@ -188,9 +188,9 @@ int CrossWalk::countAreaSize() const
 void CrossWalk::getAID(std::unordered_map<int, std::vector<int>> &bdid2aid_map) const
 {
   for (const auto &x : crosswalk_.data)
-    if (x.type == 1)
+    if (x.type == 1)      // 1-条纹,应该就是指人行道
     {                                         // if it is zebra
-      bdid2aid_map[x.bdid].push_back(x.aid);  // save area id
+      bdid2aid_map[x.bdid].push_back(x.aid);  // save area id   // 根据边界id来分组
     }
 }
 

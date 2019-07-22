@@ -20,7 +20,7 @@
 #include <autoware_msgs/LaneArray.h>
 
 namespace
-{
+{ // 从ref_lane获取从closet_waypoint到之后的航点,也就是已经在当前位置后面的航点就不要了
 autoware_msgs::Lane createPublishWaypoints(const autoware_msgs::Lane& ref_lane, int closest_waypoint,
                                                     int size)
 {
@@ -133,7 +133,7 @@ int main(int argc, char** argv)
 
     // We switch 2 waypoints, original path and avoiding path
     if (avoidance)
-      closest_waypoint = getClosestWaypoint(avoid_lane, search_info.getCurrentPose().pose);
+      closest_waypoint = getClosestWaypoint(avoid_lane, search_info.getCurrentPose().pose); // 在avoid_lane中查找最接近current,且在前方的航点
     else
       closest_waypoint = search_info.getClosestWaypointIndex();
 
@@ -156,7 +156,7 @@ int main(int argc, char** argv)
     {
       // create waypoints from closest on avoid_lane
       autoware_msgs::Lane publish_lane;
-      publish_lane = createPublishWaypoints(avoid_lane, closest_waypoint, 100);
+      publish_lane = createPublishWaypoints(avoid_lane, closest_waypoint, 100);   // 从avoid_lane中获取closest之后的航点
       waypoints_pub.publish(publish_lane);
 
       // End of avoidance

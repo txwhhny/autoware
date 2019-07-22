@@ -109,11 +109,13 @@ void VelocitySetInfo::controlPoseCallback(const geometry_msgs::PoseStampedConstP
     set_pose_ = true;
 }
 
+// 传感器位姿
 void VelocitySetInfo::localizerPoseCallback(const geometry_msgs::PoseStampedConstPtr &msg)
 {
   localizer_pose_ = *msg;
 }
 
+// 人为设置障碍物,模拟障碍物
 void VelocitySetInfo::obstacleSimCallback(const sensor_msgs::PointCloud2ConstPtr &msg)
 {
   pcl::fromROSMsg(*msg, obstacle_sim_points_);

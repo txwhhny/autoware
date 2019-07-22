@@ -143,10 +143,10 @@ private:
 
   nav_msgs::OccupancyGrid map_;
   geometry_msgs::PoseStamped start_pose_global_;
-  geometry_msgs::PoseStamped goal_pose_global_;
+  geometry_msgs::PoseStamped goal_pose_global_;     // map坐标系下的目标点
   geometry_msgs::PoseStamped transit_pose_global_;
   geometry_msgs::PoseStamped start_pose_local_;
-  geometry_msgs::PoseStamped goal_pose_local_;
+  geometry_msgs::PoseStamped goal_pose_local_;      // ogm坐标系下的目标点
   geometry_msgs::PoseStamped transit_pose_local_;
   // Transform which converts global frame (/map in Autoware) to OccupancyGrid frame
   tf::Transform ogm2map_;

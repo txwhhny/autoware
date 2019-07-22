@@ -157,7 +157,7 @@ double getRelativeAngle(geometry_msgs::Pose waypoint_pose, geometry_msgs::Pose v
   return angle;
 }
 
-// get closest waypoint from current pose
+// get closest waypoint from current pose 查找与current_pose最接近的航点,且该航点是在current的前方, x方向上的
 int getClosestWaypoint(const autoware_msgs::Lane &current_path, geometry_msgs::Pose current_pose)
 {
   WayPoints wp;
@@ -171,14 +171,14 @@ int getClosestWaypoint(const autoware_msgs::Lane &current_path, geometry_msgs::P
   std::vector<int> waypoint_candidates;
   for (int i = 1; i < wp.getSize(); i++)
   {
-    if (getPlaneDistance(wp.getWaypointPosition(i), current_pose.position) > search_distance)
+    if (getPlaneDistance(wp.getWaypointPosition(i), current_pose.position) > search_distance)   // 查找距离小于5的航点
       continue;
 
-    if (!wp.isFront(i, current_pose))
+    if (!wp.isFront(i, current_pose))     // 判断第i个点是否处于current_pose的前方, 利用相对坐标系,即以current为坐标原点表示的i航点坐标,然后直接比较x
       continue;
 
     double angle_threshold = 90;
-    if (getRelativeAngle(wp.getWaypointPose(i), current_pose) > angle_threshold)
+    if (getRelativeAngle(wp.getWaypointPose(i), current_pose) > angle_threshold)  // 计算第i个点的x方向与current的x方向夹角, 理论上应该不可能大于90度了,因为前面的前方限定
       continue;
 
     waypoint_candidates.push_back(i);
@@ -201,7 +201,7 @@ int getClosestWaypoint(const autoware_msgs::Lane &current_path, geometry_msgs::P
     }
     return waypoint_min;
   }
-  else
+  else    // 如果范围小于5的航点不存在,就在全局航点里面找
   {
     ROS_INFO("no candidate. search closest waypoint from all waypoints...");
     // if there is no candidate...
