@@ -60,7 +60,7 @@ GlobalPlanner::GlobalPlanner()
 	if(m_params.bEnableRvizInput)
 	{
 		sub_start_pose = nh.subscribe("/initialpose", 1, &GlobalPlanner::callbackGetStartPose, this);
-		sub_goal_pose = nh.subscribe("move_base_simple/goal", 1, &GlobalPlanner::callbackGetGoalPose, this);
+		sub_goal_pose = nh.subscribe("move_base_simple/goal", 1, &GlobalPlanner::callbackGetGoalPose, this);		// 设置目标点
 	}
 	else
 	{
@@ -69,14 +69,14 @@ GlobalPlanner::GlobalPlanner()
 
 	sub_current_pose = nh.subscribe("/current_pose", 10, &GlobalPlanner::callbackGetCurrentPose, this);
 
-	int bVelSource = 1;
+	int bVelSource = 1;		// 速度来源
 	nh.getParam("/op_global_planner/velocitySource", bVelSource);
 	if(bVelSource == 0)
-		sub_robot_odom = nh.subscribe("/odom", 10, &GlobalPlanner::callbackGetRobotOdom, this);
+		sub_robot_odom = nh.subscribe("/odom", 10, &GlobalPlanner::callbackGetRobotOdom, this);		// 里程计
 	else if(bVelSource == 1)
-		sub_current_velocity = nh.subscribe("/current_velocity", 10, &GlobalPlanner::callbackGetVehicleStatus, this);
+		sub_current_velocity = nh.subscribe("/current_velocity", 10, &GlobalPlanner::callbackGetVehicleStatus, this);		// autoware
 	else if(bVelSource == 2)
-		sub_can_info = nh.subscribe("/can_info", 10, &GlobalPlanner::callbackGetCANInfo, this);
+		sub_can_info = nh.subscribe("/can_info", 10, &GlobalPlanner::callbackGetCANInfo, this);		// can_info
 
 	if(m_params.bEnableDynamicMapUpdate)
 	  sub_road_status_occupancy = nh.subscribe<>("/occupancy_road_status", 1, &GlobalPlanner::callbackGetRoadStatusOccupancyGrid, this);
@@ -178,11 +178,12 @@ void GlobalPlanner::callbackGetGoalPose(const geometry_msgs::PoseStampedConstPtr
 
 void GlobalPlanner::callbackGetStartPose(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg)
 {
+	// 由于m_OriginPos是world相对于map的位置(也就是map是基坐标),msg需要加上m_OriginPos,是为了变换到map坐标系下,由此可知当前在rviz(例如)下设置时,当前所处的的world的frame_id
 	m_CurrentPose = PlannerHNS::WayPoint(msg->pose.pose.position.x+m_OriginPos.position.x, msg->pose.pose.position.y+m_OriginPos.position.y, msg->pose.pose.position.z+m_OriginPos.position.z, tf::getYaw(msg->pose.pose.orientation));
 	ROS_INFO("Received Start pose");
 }
 
-void GlobalPlanner::callbackGetCurrentPose(const geometry_msgs::PoseStampedConstPtr& msg)
+void GlobalPlanner::callbackGetCurrentPose(const geometry_msgs::PoseStampedConstPtr& msg)		// current_pose话题是来自于ndt_pose,坐标系是map
 {
 	m_CurrentPose = PlannerHNS::WayPoint(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z, tf::getYaw(msg->pose.orientation));
 }
@@ -197,10 +198,10 @@ void GlobalPlanner::callbackGetRobotOdom(const nav_msgs::OdometryConstPtr& msg)
 
 void GlobalPlanner::callbackGetVehicleStatus(const geometry_msgs::TwistStampedConstPtr& msg)
 {
-	m_VehicleState.speed = msg->twist.linear.x;
+	m_VehicleState.speed = msg->twist.linear.x;		// 单位: mps
 	m_CurrentPose.v = m_VehicleState.speed;
 	if(fabs(msg->twist.linear.x) > 0.25)
-		m_VehicleState.steer = atan(2.7 * msg->twist.angular.z/msg->twist.linear.x);
+		m_VehicleState.steer = atan(2.7 * msg->twist.angular.z/msg->twist.linear.x);		// 半径的倒数? theta / rad ?
 	UtilityHNS::UtilityH::GetTickCount(m_VehicleState.tStamp);
 }
 
@@ -208,7 +209,7 @@ void GlobalPlanner::callbackGetCANInfo(const autoware_can_msgs::CANInfoConstPtr 
 {
 	m_VehicleState.speed = msg->speed/3.6;
 	m_CurrentPose.v = m_VehicleState.speed;
-	m_VehicleState.steer = msg->angle * 0.45 / 660;
+	m_VehicleState.steer = msg->angle * 0.45 / 660;				// 0.45 和 660怎么来的, 为什么这么计算?
 	UtilityHNS::UtilityH::GetTickCount(m_VehicleState.tStamp);
 }
 
@@ -407,7 +408,7 @@ void GlobalPlanner::MainLoop()
 		ros::spinOnce();
 		bool bMakeNewPlan = false;
 
-		if(m_params.mapSource == PlannerHNS::MAP_KML_FILE && !m_bKmlMap)
+		if(m_params.mapSource == PlannerHNS::MAP_KML_FILE && !m_bKmlMap)		// 构造m_Map
 		{
 			m_bKmlMap = true;
 			PlannerHNS::MappingHelpers::LoadKML(m_params.KmlMapPath, m_Map);
@@ -467,11 +468,11 @@ void GlobalPlanner::MainLoop()
 				if(m_params.bEnableReplanning)
 				{
 					PlannerHNS::RelativeInfo info;
-					bool ret = PlannerHNS::PlanningHelpers::GetRelativeInfoRange(m_GeneratedTotalPaths, m_CurrentPose, 0.75, info);
+					bool ret = PlannerHNS::PlanningHelpers::GetRelativeInfoRange(m_GeneratedTotalPaths, m_CurrentPose, 0.75, info);	// 从多条车道,选出代价最小的
 					if(ret == true && info.iGlobalPath >= 0 &&  info.iGlobalPath < m_GeneratedTotalPaths.size() && info.iFront > 0 && info.iFront < m_GeneratedTotalPaths.at(info.iGlobalPath).size())
 					{
 						double remaining_distance =    m_GeneratedTotalPaths.at(info.iGlobalPath).at(m_GeneratedTotalPaths.at(info.iGlobalPath).size()-1).cost - (m_GeneratedTotalPaths.at(info.iGlobalPath).at(info.iFront).cost + info.to_front_distance);
-						if(remaining_distance <= REPLANNING_DISTANCE)
+						if(remaining_distance <= REPLANNING_DISTANCE)		// 判断是否已经到达目标点
 						{
 							bMakeNewPlan = true;
 							if(m_GoalsPos.size() > 0)

@@ -137,9 +137,9 @@ double PlannerH::PlanUsingDP(const WayPoint& start,
 		const bool bEnableLaneChange,
 		const std::vector<int>& globalPath,
 		RoadNetwork& map,
-		std::vector<std::vector<WayPoint> >& paths, vector<WayPoint*>* all_cell_to_delete)
+		std::vector<std::vector<WayPoint> >& paths, vector<WayPoint*>* all_cell_to_delete)		// all_cell_to_delete默认为0
 {
-	PlannerHNS::WayPoint* pStart = PlannerHNS::MappingHelpers::GetClosestWaypointFromMap(start, map);
+	PlannerHNS::WayPoint* pStart = PlannerHNS::MappingHelpers::GetClosestWaypointFromMap(start, map);	// 在map中获得最接近start的车道的航点
 	PlannerHNS::WayPoint* pGoal = PlannerHNS::MappingHelpers::GetClosestWaypointFromMap(goalPos, map);
 	bool bEnableGoalBranching = false;
 

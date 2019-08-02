@@ -909,13 +909,13 @@ TiXmlElement* MappingHelpers::GetDataFolder(const string& folderName, TiXmlEleme
 	return nullptr;
 }
 
-WayPoint* MappingHelpers::GetClosestWaypointFromMap(const WayPoint& pos, RoadNetwork& map, const bool bDirectionBased)
+WayPoint* MappingHelpers::GetClosestWaypointFromMap(const WayPoint& pos, RoadNetwork& map, const bool bDirectionBased)// bDirectionBased默认为true
 {
 	double distance_to_nearest_lane = 1;
 	Lane* pLane = 0;
-	while(distance_to_nearest_lane < 100 && pLane == 0)
+	while(distance_to_nearest_lane < 100 && pLane == 0)	// 最远检查到100, 一旦找到则退出循环
 	{
-		pLane = GetClosestLaneFromMap(pos, map, distance_to_nearest_lane, bDirectionBased);
+		pLane = GetClosestLaneFromMap(pos, map, distance_to_nearest_lane, bDirectionBased);		
 		distance_to_nearest_lane += 1;
 	}
 
@@ -996,14 +996,14 @@ Lane* MappingHelpers::GetClosestLaneFromMap(const WayPoint& pos, RoadNetwork& ma
 	vector<pair<double, Lane*> > laneLinksList;
 	double d = 0;
 	double min_d = DBL_MAX;
-	for(unsigned int j=0; j< map.roadSegments.size(); j ++)
+	for(unsigned int j=0; j< map.roadSegments.size(); j ++)		// 多个segment
 	{
-		for(unsigned int k=0; k< map.roadSegments.at(j).Lanes.size(); k ++)
+		for(unsigned int k=0; k< map.roadSegments.at(j).Lanes.size(); k ++)	// 每个segment有多个lane
 		{
 			//Lane* pLane = &pEdge->lanes.at(k);
 			 d = 0;
 			min_d = DBL_MAX;
-			for(unsigned int pindex=0; pindex< map.roadSegments.at(j).Lanes.at(k).points.size(); pindex ++)
+			for(unsigned int pindex=0; pindex< map.roadSegments.at(j).Lanes.at(k).points.size(); pindex ++)	// 从lane中找出各个点与pos的最短欧式距离
 			{
 
 				d = distance2points(map.roadSegments.at(j).Lanes.at(k).points.at(pindex).pos, pos.pos);
@@ -1012,7 +1012,7 @@ Lane* MappingHelpers::GetClosestLaneFromMap(const WayPoint& pos, RoadNetwork& ma
 			}
 
 			if(min_d < distance)
-				laneLinksList.push_back(make_pair(min_d, &map.roadSegments.at(j).Lanes.at(k)));
+				laneLinksList.push_back(make_pair(min_d, &map.roadSegments.at(j).Lanes.at(k)));		// 把符合要求的最短欧式距离与lane的指针保存下来
 		}
 	}
 
@@ -1023,7 +1023,7 @@ Lane* MappingHelpers::GetClosestLaneFromMap(const WayPoint& pos, RoadNetwork& ma
 	for(unsigned int i = 0; i < laneLinksList.size(); i++)
 	{
 		RelativeInfo info;
-		PlanningHelpers::GetRelativeInfo(laneLinksList.at(i).second->points, pos, info);
+		PlanningHelpers::GetRelativeInfo(laneLinksList.at(i).second->points, pos, info);	// first-distance, second-lane*
 
 		if(info.perp_distance == 0 && laneLinksList.at(i).first != 0)
 			continue;

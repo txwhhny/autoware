@@ -31,7 +31,7 @@ bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoin
 	if(trajectories.size() == 0) return false;
 
 	vector<RelativeInfo> infos;
-	for(unsigned int i=0; i < trajectories.size(); i++)
+	for(unsigned int i=0; i < trajectories.size(); i++)		// 多个车道,每个车道都是一系列航点
 	{
 		RelativeInfo info_item;
 		GetRelativeInfo(trajectories.at(i), p, info_item);
@@ -54,7 +54,7 @@ bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoin
 	double minCost = DBL_MAX;
 	int min_index = 0;
 
-	for(unsigned int i=0 ; i< infos.size(); i++)
+	for(unsigned int i=0 ; i< infos.size(); i++)		// 遍历所有路线, 选出代价最小的航线
 	{
 		if(searchDistance > 0)
 		{
@@ -81,7 +81,7 @@ bool PlanningHelpers::GetRelativeInfoRange(const std::vector<std::vector<WayPoin
 }
 
 
-bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex )
+bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex ) //prevIndex默认为0
 {
 	if(trajectory.size() < 2) return false;
 
@@ -97,7 +97,7 @@ bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, c
 	}
 	else
 	{
-		info.iFront = GetClosestNextPointIndexFast(trajectory, p, prevIndex);
+		info.iFront = GetClosestNextPointIndexFast(trajectory, p, prevIndex);		// 找到轨迹中, 最接近p的处于前方的点索引
 //		WayPoint p2 = p;
 //		int old_index = GetClosestNextPointIndex(trajectory, p2, prevIndex);
 //		if(old_index != info.iFront)
@@ -126,30 +126,30 @@ bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, c
 	}
 
 	WayPoint prevWP = p0;
-	Mat3 rotationMat(-p1.pos.a);
-	Mat3 translationMat(-p.pos.x, -p.pos.y);
+	Mat3 rotationMat(-p1.pos.a);		// p1所在坐标系的偏航
+	Mat3 translationMat(-p.pos.x, -p.pos.y);	// p所在坐标系的原点
 	Mat3 invRotationMat(p1.pos.a);
 	Mat3 invTranslationMat(p.pos.x, p.pos.y);
 
-	p0.pos = translationMat*p0.pos;
+	p0.pos = translationMat*p0.pos;		// 相当于以p为原点,以p1方位作为航向 
 	p0.pos = rotationMat*p0.pos;
 
 	p1.pos = translationMat*p1.pos;
 	p1.pos = rotationMat*p1.pos;
 
-	double m = (p1.pos.y-p0.pos.y)/(p1.pos.x-p0.pos.x);
+	double m = (p1.pos.y-p0.pos.y)/(p1.pos.x-p0.pos.x);  // m相当于tan(theta), theta是p1与p0连线相对于x的夹角
 	info.perp_distance = p1.pos.y - m*p1.pos.x; // solve for x = 0
 
 	if(std::isnan(info.perp_distance) || std::isinf(info.perp_distance)) info.perp_distance = 0;
 
 	info.to_front_distance = fabs(p1.pos.x); // distance on the x axes
 
-
+	// info.prep_point 以p为原点,p1偏航为x正方向的坐标系下的点,且该点是p1和p0连线与该坐标系y轴的交点.一般来说交点处于p0和p1之间, 也就是p1和p0的连线上
 	info.perp_point = p1;
 	info.perp_point.pos.x = 0; // on the same y axis of the car
 	info.perp_point.pos.y = info.perp_distance; //perp distance between the car and the trajectory
 
-	info.perp_point.pos = invRotationMat  * info.perp_point.pos;
+	info.perp_point.pos = invRotationMat  * info.perp_point.pos;	// 转换回原坐标系
 	info.perp_point.pos = invTranslationMat  * info.perp_point.pos;
 
 	info.from_back_distance = hypot(info.perp_point.pos.y - prevWP.pos.y, info.perp_point.pos.x - prevWP.pos.x);
@@ -604,7 +604,7 @@ int PlanningHelpers::GetClosestNextPointIndexFastV2(const vector<WayPoint>& traj
 
 
 }
-
+// 在轨迹中查找最接近p的航点的索引
 int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex )
 {
 	int size = (int)trajectory.size();
@@ -627,25 +627,25 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 		if(resolution > 0)
 			skip = skip_factor/resolution;
 
-		for(int i=0; i< size; i+=skip)
+		for(int i=0; i< size; i+=skip)		// 以skip为航点间隔距离,粗略计算
 		{
-			if(i+skip/2 < size)
+			if(i+skip/2 < size)			// 之所以计算的是i与p以及i+skip/2与p即可, 是因为skip将在下一次循环作为i来处理了
 				d  = (distance2pointsSqr(trajectory[i].pos, p.pos) + distance2pointsSqr(trajectory[i+skip/2].pos, p.pos))/2.0;
 			else
 				d  = distance2pointsSqr(trajectory[i].pos, p.pos);
 			if(d < minD)
 			{
-				iStart = i-skip;
+				iStart = i-skip;		// 如果有更小的,则临时保存
 				iEnd = i+skip;
 				minD = d;
 				min_index = i;
 			}
 		}
 
-		if((size - skip/2 - 1) > 0)
+		if((size - skip/2 - 1) > 0)		// 处理末尾的航点,有必要?感觉在上述循环已经能处理到了
 			d  = (distance2pointsSqr(trajectory[size-1].pos, p.pos) + distance2pointsSqr(trajectory[size - skip/2 -1 ].pos, p.pos))/2.0;
 		else
-			d  = distance2pointsSqr(trajectory[size-1].pos, p.pos);
+			d  = distance2pointsSqr(trajectory[size-1].pos, p.pos);	// 这里采用distance2pointsSqr,没有开方是因为纯粹比较,开方后也比较只会增加计算量,无实际意义
 
 		if(d < minD)
 		{
@@ -655,10 +655,10 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 			min_index = size-1;
 		}
 
-		if(iStart < 0) iStart = 0;
+		if(iStart < 0) iStart = 0;			// 处理下istart和iend的越界问题
 		if(iEnd >= size) iEnd = size -1;
 
-		for(int i=iStart; i< iEnd; i++)
+		for(int i=iStart; i< iEnd; i++)	// 在istart和iend间逐个航点进行比较(上面是通过skip步长粗略比较,这里1为步长精确定位)
 		{
 			d  = distance2pointsSqr(trajectory[i].pos, p.pos);
 			if(d < minD)
@@ -677,8 +677,8 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 			double norm1 = pointNorm(v_1);
 			GPSPoint v_2(next.x - curr.x,next.y - curr.y,0,0);
 			double norm2 = pointNorm(v_2);
-			double dot_pro = v_1.x*v_2.x + v_1.y*v_2.y;
-			double a = UtilityH::FixNegativeAngle(acos(dot_pro/(norm1*norm2)));
+			double dot_pro = v_1.x*v_2.x + v_1.y*v_2.y;				// 向量点乘
+			double a = UtilityH::FixNegativeAngle(acos(dot_pro/(norm1*norm2)));	// 求出以current为原点, p和next为顶点的两个向量的夹角
 			if(a <= M_PI_2)
 				min_index = min_index+1;
 		}

@@ -461,6 +461,7 @@ void ROSHelpers::ConvertFromPlannerHToAutowarePathFormat(const std::vector<Plann
 	}
 }
 
+// 把map按lane中的id转成visualization_msgs::MarkerArray消息类型
 void ROSHelpers::ConvertFromRoadNetworkToAutowareVisualizeMapFormat(const PlannerHNS::RoadNetwork& map,	visualization_msgs::MarkerArray& markerArray)
 {
 	visualization_msgs::Marker lane_waypoint_marker;
@@ -481,14 +482,14 @@ void ROSHelpers::ConvertFromRoadNetworkToAutowareVisualizeMapFormat(const Planne
 
 	markerArray.markers.clear();
 
-	for(unsigned int i = 0; i< map.roadSegments.size(); i++)
+	for(unsigned int i = 0; i< map.roadSegments.size(); i++)		// map包含多个roadSegment
 	{
-		for(unsigned int j = 0; j < map.roadSegments.at(i).Lanes.size(); j++)
+		for(unsigned int j = 0; j < map.roadSegments.at(i).Lanes.size(); j++)	// roadSegment包含多个lane
 		{
 			lane_waypoint_marker.points.clear();
 
 			lane_waypoint_marker.id = map.roadSegments.at(i).Lanes.at(j).id;
-			for(unsigned int p = 0; p < map.roadSegments.at(i).Lanes.at(j).points.size(); p++)
+			for(unsigned int p = 0; p < map.roadSegments.at(i).Lanes.at(j).points.size(); p++)	// 一个lane包含多个point
 			{
 				geometry_msgs::Point point;
 

@@ -464,17 +464,17 @@ public:
 class RelativeInfo
 {
 public:
-	double perp_distance;
-	double to_front_distance; //negative
-	double from_back_distance;
-	int iFront;
+	double perp_distance;		// 当前位姿与perp_point的距离
+	double to_front_distance; //negative // perp_point与p1的距离
+	double from_back_distance; // perp_point与p0的距离
+	int iFront;								// 距离当前位姿最近的航点,前面和后面
 	int iBack;
 	int iGlobalPath;
-	WayPoint perp_point;
-	double angle_diff; // degrees
+	WayPoint perp_point;	// 当前位姿为原点,p1偏航为x正向的坐标系下,p0与p1连线在y轴的交点
+	double angle_diff; // degrees	// 当前位姿与p1的夹角
 	bool bBefore;
 	bool bAfter;
-	double after_angle;
+	double after_angle;	
 
 	RelativeInfo()
 	{
