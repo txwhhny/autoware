@@ -198,10 +198,10 @@ double PlannerH::PlanUsingDP(const WayPoint& start,
 
 	if(all_cell_to_delete)
 		pLaneCell =  PlanningHelpers::BuildPlanningSearchTreeV2(pStart, *pGoal, globalPath, maxPlanningDistance,bEnableLaneChange, *all_cell_to_delete);
-	else
+	else		// 通过pStart不断查找其front的点,直到接近了目标点.local_cell_to_delete实际上已经是lane定义的可达目标点的序列了,后面根据pLaneCell生成的路径点其实是从这里面拿出来计算的
 		pLaneCell =  PlanningHelpers::BuildPlanningSearchTreeV2(pStart, *pGoal, globalPath, maxPlanningDistance,bEnableLaneChange, local_cell_to_delete);
 
-	if(!pLaneCell)
+	if(!pLaneCell)	// pLaneCell如果不为空,其实是local_cell_to_delete的最后一个元素,也是接近pGoal的或者在内容上与pGoal是相同的
 	{
 		bPlan = 'B';
 		cout << endl << "PlannerH -> Plan (A) Failed, Trying Plan (B)." << endl;
@@ -221,7 +221,7 @@ double PlannerH::PlanUsingDP(const WayPoint& start,
 
 	vector<WayPoint> path;
 	vector<vector<WayPoint> > tempCurrentForwardPathss;
-	PlanningHelpers::TraversePathTreeBackwards(pLaneCell, pStart, globalPath, path, tempCurrentForwardPathss);
+	PlanningHelpers::TraversePathTreeBackwards(pLaneCell, pStart, globalPath, path, tempCurrentForwardPathss);	// 根据pLaneCell生成路径,并检查globalPath中是否有代价更小的节点
 	if(path.size()==0) return 0;
 
 	paths.clear();

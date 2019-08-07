@@ -399,7 +399,7 @@ public:
 	std::vector<std::pair<ACTION_TYPE, double> > actionCost;
 
 	int			originalMapID;
-	int			gid;
+	int			gid;		// 路径规划可能会有多条, 这是路径的id
 
 	WayPoint()
 	{

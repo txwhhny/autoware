@@ -1218,19 +1218,19 @@ void PlanningHelpers::SmoothPath(vector<WayPoint>& path, double weight_data,
 			xtemp = smoothPath_out[i].pos.x;
 			ytemp = smoothPath_out[i].pos.y;
 
-			smoothPath_out[i].pos.x += weight_data
+			smoothPath_out[i].pos.x += weight_data		// 加上weight_data*(path_in - smoothPath_out)
 					* (path_in[i].pos.x - smoothPath_out[i].pos.x);
 			smoothPath_out[i].pos.y += weight_data
 					* (path_in[i].pos.y - smoothPath_out[i].pos.y);
 
-			smoothPath_out[i].pos.x += weight_smooth
+			smoothPath_out[i].pos.x += weight_smooth	// 加上weight_smoth*(smoothPath_out的前后差值)
 					* (smoothPath_out[i - 1].pos.x + smoothPath_out[i + 1].pos.x
 							- (2.0 * smoothPath_out[i].pos.x));
 			smoothPath_out[i].pos.y += weight_smooth
 					* (smoothPath_out[i - 1].pos.y + smoothPath_out[i + 1].pos.y
 							- (2.0 * smoothPath_out[i].pos.y));
 
-			change += fabs(xtemp - smoothPath_out[i].pos.x);
+			change += fabs(xtemp - smoothPath_out[i].pos.x);	// 累加变化量
 			change += fabs(ytemp - smoothPath_out[i].pos.y);
 
 		}
@@ -1286,10 +1286,10 @@ void PlanningHelpers::FixAngleOnly(std::vector<WayPoint>& path)
 	}
 }
 
-double PlanningHelpers::CalcAngleAndCost(vector<WayPoint>& path, const double& lastCost, const bool& bSmooth)
+double PlanningHelpers::CalcAngleAndCost(vector<WayPoint>& path, const double& lastCost, const bool& bSmooth)	// lastCost==0, bSmoth==true
 {
 	if(path.size() < 2) return 0;
-	if(path.size() == 2)
+	if(path.size() == 2)		// 路径只有两个点
 	{
 		path[0].pos.a = UtilityH::FixNegativeAngle(atan2(path[1].pos.y - path[0].pos.y, path[1].pos.x - path[0].pos.x ));
 		path[0].cost = lastCost;
@@ -1299,9 +1299,9 @@ double PlanningHelpers::CalcAngleAndCost(vector<WayPoint>& path, const double& l
 	}
 
 	path[0].pos.a = UtilityH::FixNegativeAngle(atan2(path[1].pos.y - path[0].pos.y, path[1].pos.x - path[0].pos.x ));
-	path[0].cost = lastCost;
+	path[0].cost = lastCost;		// 第一个点cost相当于设置为0
 
-	for(int j = 1; j < path.size()-1; j++)
+	for(int j = 1; j < path.size()-1; j++)	// 重新计算各个点的cost和angle
 	{
 		path[j].pos.a 		= UtilityH::FixNegativeAngle(atan2(path[j+1].pos.y - path[j].pos.y, path[j+1].pos.x - path[j].pos.x ));
 		path[j].cost 	= path[j-1].cost +  distance2points(path[j-1].pos, path[j].pos);
@@ -1312,7 +1312,7 @@ double PlanningHelpers::CalcAngleAndCost(vector<WayPoint>& path, const double& l
 	path[j].pos.a 		= path[j-1].pos.a;
 	path[j].cost 	= path[j-1].cost + distance2points(path[j-1].pos, path[j].pos);
 
-	for(int j = 0; j < path.size()-1; j++)
+	for(int j = 0; j < path.size()-1; j++)		// 如果位置相同,则航向也设置成相同
 	{
 		if(path.at(j).pos.x == path.at(j+1).pos.x && path.at(j).pos.y == path.at(j+1).pos.y)
 			path.at(j).pos.a = path.at(j+1).pos.a;
@@ -1955,13 +1955,13 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 {
 	if(!pStart) return NULL;
 
-	vector<pair<WayPoint*, WayPoint*> >nextLeafToTrace;
+	vector<pair<WayPoint*, WayPoint*> >nextLeafToTrace;	// 存放下一个要合并的航点
 
 	WayPoint* pZero = 0;
 	WayPoint* wp    = new WayPoint();
 	*wp = *pStart;
 	nextLeafToTrace.push_back(make_pair(pZero, wp));
-	all_cells_to_delete.push_back(wp);
+	all_cells_to_delete.push_back(wp);		// 输出的航线
 
 	double 		distance 		= 0;
 	double 		before_change_distance	= 0;
@@ -1980,7 +1980,7 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 		{
 			if(nextLeafToTrace.at(i).second->cost < min_cost)
 			{
-				min_cost = nextLeafToTrace.at(i).second->cost;
+				min_cost = nextLeafToTrace.at(i).second->cost;		// 这里突然冒出的cost是根据lane来算的,在所属的lane中,第0个点cost是0,第1个点则为与第0个点的距离,第2个点为前面两段的距离,应该是在构造roadnet的时候就生成的.
 				min_cost_index = i;
 			}
 		}
@@ -1991,7 +1991,7 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 
 		nextLeafToTrace.erase(nextLeafToTrace.begin()+min_cost_index);
 
-		double distance_to_goal = distance2points(pH->pos, goalPos.pos);
+		double distance_to_goal = distance2points(pH->pos, goalPos.pos);		// 检查是否已经到达目标点
 		double angle_to_goal = UtilityH::AngleBetweenTwoAnglesPositive(UtilityH::FixNegativeAngle(pH->pos.a), UtilityH::FixNegativeAngle(goalPos.pos.a));
 		if( distance_to_goal <= 0.1 && angle_to_goal < M_PI_4)
 		{
@@ -2045,8 +2045,8 @@ WayPoint* PlanningHelpers::BuildPlanningSearchTreeV2(WayPoint* pStart,
 				all_cells_to_delete.push_back(wp);
 			}
 
-			for(unsigned int i =0; i< pH->pFronts.size(); i++)
-			{
+			for(unsigned int i =0; i< pH->pFronts.size(); i++)		// 这里pH的pFronts如果是pH所属的lane已经到终点了,则pFronts为下一个与当前lane连接的lane,应该也是在构建roadnet的时候就连接了.
+			{	// CheckLaneIdExits:要么globalPath为空,要么得包含pH->pLane,all_cells_to_delete为空,或者不包含pH->pFronts.at(i)
 				if(CheckLaneIdExits(globalPath, pH->pLane) && pH->pFronts.at(i) && !CheckNodeExits(all_cells_to_delete, pH->pFronts.at(i)))
 				{
 					wp = new WayPoint();
@@ -2449,7 +2449,7 @@ double PlanningHelpers::GetLanePoints(Lane* l, const WayPoint& prevWayPointIndex
 
 WayPoint* PlanningHelpers::GetMinCostCell(const vector<WayPoint*>& cells, const vector<int>& globalPathIds)
 {
-	if(cells.size() == 1)
+	if(cells.size() == 1)			// 只有一个元素, 直接返回
 	{
 //		for(unsigned int j = 0; j < cells.at(0)->actionCost.size(); j++)
 //			cout << "Cost (" << cells.at(0)->laneId << ") of going : " << cells.at(0)->actionCost.at(j).first << ", is : " << cells.at(0)->actionCost.at(j).second << endl;
@@ -2460,13 +2460,13 @@ WayPoint* PlanningHelpers::GetMinCostCell(const vector<WayPoint*>& cells, const 
 	for(unsigned int i=1; i < cells.size(); i++)
 	{
 		bool bFound = false;
-		if(globalPathIds.size()==0)
+		if(globalPathIds.size()==0)		// globalPathIds为空,直接返回cells第一个元素
 			bFound = true;
 
 		int iLaneID = cells.at(i)->id;
 		for(unsigned int j=0; j < globalPathIds.size(); j++)
 		{
-			if(globalPathIds.at(j) == iLaneID)
+			if(globalPathIds.at(j) == iLaneID)		// 在globalPathIds中找到cells中的某一个元素
 			{
 				bFound = true;
 				break;
@@ -2477,7 +2477,7 @@ WayPoint* PlanningHelpers::GetMinCostCell(const vector<WayPoint*>& cells, const 
 //			cout << "Cost ("<< i <<") of going : " << cells.at(0)->actionCost.at(j).first << ", is : " << cells.at(0)->actionCost.at(j).second << endl;
 
 
-		if(cells.at(i)->cost < pC->cost && bFound == true)
+		if(cells.at(i)->cost < pC->cost && bFound == true)	// 比较cells第一个元素和同时在cells和globalPathIds中的那个元素比较,取代价小的
 			pC = cells.at(i);
 	}
 
@@ -2544,14 +2544,14 @@ void PlanningHelpers::ExtractPlanAlernatives(const std::vector<WayPoint>& single
 	allPaths.push_back(path);
 }
 
-void PlanningHelpers::TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStartWP,const vector<int>& globalPathIds,
+void PlanningHelpers::TraversePathTreeBackwards(WayPoint* pHead, WayPoint* pStartWP,const vector<int>& globalPathIds,		// 目前数据globalPathIds是空的
 		vector<WayPoint>& localPath, std::vector<std::vector<WayPoint> >& localPaths)
 {
 	if(pHead != NULL && pHead->id != pStartWP->id)
 	{
 		if(pHead->pBacks.size()>0)
 		{
-			localPaths.push_back(localPath);
+			localPaths.push_back(localPath);		// localPaths目前未看到有什么用,起码在这个分支是这样
 			TraversePathTreeBackwards(GetMinCostCell(pHead->pBacks, globalPathIds),pStartWP, globalPathIds, localPath, localPaths);
 			pHead->bDir = FORWARD_DIR;
 			localPath.push_back(*pHead);

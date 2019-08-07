@@ -67,7 +67,7 @@ GlobalPlanner::GlobalPlanner()
 		LoadSimulationData();
 	}
 
-	sub_current_pose = nh.subscribe("/current_pose", 10, &GlobalPlanner::callbackGetCurrentPose, this);
+	sub_current_pose = nh.subscribe("/current_pose", 10, &GlobalPlanner::callbackGetCurrentPose, this);		// 这个pose其实是ndt_pose,但是这里要求是world坐标系下的
 
 	int bVelSource = 1;		// 速度来源
 	nh.getParam("/op_global_planner/velocitySource", bVelSource);
@@ -234,14 +234,14 @@ bool GlobalPlanner::GenerateGlobalPlan(PlannerHNS::WayPoint& startPoint, Planner
 		{
 			for(unsigned int i=0; i < generatedTotalPaths.size(); i++)
 			{
-				PlannerHNS::PlanningHelpers::FixPathDensity(generatedTotalPaths.at(i), m_params.pathDensity);
-				PlannerHNS::PlanningHelpers::SmoothPath(generatedTotalPaths.at(i), 0.49, 0.35 , 0.01);
+				PlannerHNS::PlanningHelpers::FixPathDensity(generatedTotalPaths.at(i), m_params.pathDensity);		// 均匀分布路径上的点,而不只是简单的使用原有的waypoint, 距离为pathDensity
+				PlannerHNS::PlanningHelpers::SmoothPath(generatedTotalPaths.at(i), 0.49, 0.35 , 0.01);		// 平滑处理
 			}
 		}
 
 		for(unsigned int i=0; i < generatedTotalPaths.size(); i++)
 		{
-			PlannerHNS::PlanningHelpers::CalcAngleAndCost(generatedTotalPaths.at(i));
+			PlannerHNS::PlanningHelpers::CalcAngleAndCost(generatedTotalPaths.at(i));	// 重新计算代价和angle,因为现在的cost还是原有的lane定义的代价,是不准确的,因为用户起点不一定就是某一lane的起点,而且如果有平滑处理,cost都会变化
 			if(m_GlobalPathID > 10000)
 				m_GlobalPathID = 1;
 
