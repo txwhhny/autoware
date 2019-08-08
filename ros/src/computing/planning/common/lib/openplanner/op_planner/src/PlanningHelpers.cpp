@@ -318,7 +318,7 @@ bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajec
 			double angle_from_perp = UtilityH::FixNegativeAngle(atan2(info.perp_point.pos.y - trajectory.at(s-1).pos.y, info.perp_point.pos.x - trajectory.at(s-1).pos.x));
 			double diff_last_perp = UtilityH::AngleBetweenTwoAnglesPositive(angle_befor_last, angle_from_perp);
 			info.after_angle = diff_last_perp;
-			if(diff_last_perp > M_PI_2)
+			if(diff_last_perp > M_PI_2)		// 这个只原则上应该只有0和M_PI, 以最后一个点为分界,0表示info.perp_point和s-2同一侧, M_PI表示和s-2分别位于s-1的两侧
 			{
 				info.bAfter = true;
 			}

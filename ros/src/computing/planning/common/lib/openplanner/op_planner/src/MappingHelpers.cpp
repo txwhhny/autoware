@@ -2300,16 +2300,16 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 	}
 
 	cout << " >> Extracting Lanes ... " << endl;
-	CreateLanes(pLaneData, pPointsData, pNodesData, roadLanes);
+	CreateLanes(pLaneData, pPointsData, pNodesData, roadLanes);		// 根据lane的jct,blid,flid,blid2,flid2...分割lane, 得到各个wp的fromIds和toIds
 
 	cout << " >> Fix Waypoints errors ... " << endl;
-	FixTwoPointsLanes(roadLanes);
-	FixRedundantPointsLanes(roadLanes);
+	FixTwoPointsLanes(roadLanes);			// 如果lane只有两个航点, 则在中间插入1个航点, 计算所有wp的航向以及cost
+	FixRedundantPointsLanes(roadLanes);		// 删除航线中重叠的点,也就是距离为0的点,修复航向
 
-	ConnectLanes(pLaneData, roadLanes);
+	ConnectLanes(pLaneData, roadLanes);		// 设置lane之间的fromIds和toIds, 注意,这里的Ids都是点的原始所属laneid, 而不是合并后的laneid
 
 	cout << " >> Create Missing lane connections ... " << endl;
-	FixUnconnectedLanes(roadLanes);
+	FixUnconnectedLanes(roadLanes);				// 还没看懂
 	////FixTwoPointsLanes(roadLanes);
 
 	//map has one road segment
@@ -2388,7 +2388,7 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 
 	//Link StopLines and Traffic Lights
 	cout << " >> Link StopLines and Traffic Lights ... " << endl;
-	LinkTrafficLightsAndStopLinesV2(map);
+	LinkTrafficLights	AndStopLinesV2(map);
 //	//LinkTrafficLightsAndStopLinesConData(conn_data, id_replace_list, map);
 
 	cout << " >> Map loaded from data with " << roadLanes.size()  << " lanes" << endl;
@@ -2499,9 +2499,9 @@ void MappingHelpers::ConnectLanes(UtilityHNS::AisanLanesFileReader* pLaneData, s
 {
 	for(unsigned int il = 0; il < lanes.size(); il++)
 	{
-		WayPoint fp = lanes.at(il).points.at(0);
-		UtilityHNS::AisanLanesFileReader::AisanLane* pFirstL = pLaneData->GetDataRowById(fp.originalMapID);
-		if(pFirstL!=nullptr)
+		WayPoint fp = lanes.at(il).points.at(0); // 依次获取航线的第0个航点
+		UtilityHNS::AisanLanesFileReader::AisanLane* pFirstL = pLaneData->GetDataRowById(fp.originalMapID);	// originalMapID为fp原来所属的laneid
+		if(pFirstL!=nullptr)	// 判断fp所属的原始lane是否为空
 		{
 			if(pFirstL->BLID > 0)
 				lanes.at(il).fromIds.push_back(pFirstL->BLID);
@@ -2514,7 +2514,7 @@ void MappingHelpers::ConnectLanes(UtilityHNS::AisanLanesFileReader* pLaneData, s
 		}
 
 		WayPoint ep = lanes.at(il).points.at(lanes.at(il).points.size()-1);
-		UtilityHNS::AisanLanesFileReader::AisanLane* pEndL = pLaneData->GetDataRowById(ep.originalMapID);
+		UtilityHNS::AisanLanesFileReader::AisanLane* pEndL = pLaneData->GetDataRowById(ep.originalMapID);	// 同上,获取最后一个航点的原始所属lane指针
 		if(pEndL!=nullptr)
 		{
 			if(pEndL->FLID > 0)
@@ -2562,7 +2562,7 @@ void MappingHelpers::GetLanePoints(UtilityHNS::AisanLanesFileReader* pLaneData,
 
 	while(!bStart)
 	{
-		pL = pLaneData->GetDataRowById(next_lnid);
+		pL = pLaneData->GetDataRowById(next_lnid);				// 当前要处理的lane
 		if(pL == nullptr)
 		{
 			cout << "## Error, Can't find lane from ID: " << next_lnid <<endl;
@@ -2573,7 +2573,7 @@ void MappingHelpers::GetLanePoints(UtilityHNS::AisanLanesFileReader* pLaneData,
 		if(next_lnid == 0)
 			bStart = true;
 		else
-			bStart = IsStartLanePoint(pLaneData, pLaneData->GetDataRowById(next_lnid));
+			bStart = IsStartLanePoint(pLaneData, pLaneData->GetDataRowById(next_lnid));	// 从Lane数据中找出next_lnid对应的lane,判断是否是起始的lane
 
 //		if(_lnid == 1267 ) //|| _lnid == 1268 || _lnid == 1269 || _lnid == 958)
 //			out_lane.id = lnID;
@@ -2671,12 +2671,12 @@ void MappingHelpers::GetLanePoints(UtilityHNS::AisanLanesFileReader* pLaneData,
 		else
 		{
 			WayPoint wp;
-			GetPointFromDataList(pPointsData, pNodesData->GetDataRowById(pL->FNID)->PID, wp);
+			GetPointFromDataList(pPointsData, pNodesData->GetDataRowById(pL->FNID)->PID, wp);		// 把当前lane的第二端点存入wp
 			wp.v = pL->RefVel == 0 ? DEFAULT_REF_VELOCITY : pL->RefVel;
 			wp.id = pL->FNID;
 
-			out_lane.points.at(out_lane.points.size()-1).toIds.push_back(wp.id);
-			wp.fromIds.push_back(out_lane.points.at(out_lane.points.size()-1).id);
+			out_lane.points.at(out_lane.points.size()-1).toIds.push_back(wp.id);		// 设置上一个wp的toIds, 为当前wp的id
+			wp.fromIds.push_back(out_lane.points.at(out_lane.points.size()-1).id);	// 当前wp的fromIds,设置为上一个wp的id
 
 			if(bStart && pL->FLID != 0)
 			{
@@ -2686,7 +2686,7 @@ void MappingHelpers::GetLanePoints(UtilityHNS::AisanLanesFileReader* pLaneData,
 			}
 			if(pL->FLID2 != 0)
 			{
-				_rID = GetEndPointIdFromLaneNo(pLaneData, pPointsData, pNodesData, pL->FLID2);
+				_rID = GetEndPointIdFromLaneNo(pLaneData, pPointsData, pNodesData, pL->FLID2);	// 根据laneid获取该lane的第一个端点
 				if(_rID > 0)
 					wp.toIds.push_back(_rID);
 			}
@@ -2716,8 +2716,8 @@ void MappingHelpers::GetLanePoints(UtilityHNS::AisanLanesFileReader* pLaneData,
 				wp.actionCost.push_back(make_pair(FORWARD_ACTION, 0));
 			}
 
-			wp.originalMapID = pL->LnID;
-			wp.laneId = lnID;
+			wp.originalMapID = pL->LnID;		// wp的原始的所属laneid
+			wp.laneId = lnID;								// 并入现有laneid
 
 			out_lane.points.push_back(wp);
 		}
@@ -2803,8 +2803,8 @@ void MappingHelpers::FixTwoPointsLanes(std::vector<Lane>& lanes)
 
 	for(unsigned int il=0; il < lanes.size(); il ++)
 	{
-		FixTwoPointsLane(lanes.at(il));
-		PlannerHNS::PlanningHelpers::CalcAngleAndCost(lanes.at(il).points);
+		FixTwoPointsLane(lanes.at(il));		// 如果lane只有两个点,中间插一个点进去
+		PlannerHNS::PlanningHelpers::CalcAngleAndCost(lanes.at(il).points);	// 计算航向和cost, 航向是两点的连线方向,如0指向1的方向作为0点的航向,最后一点和倒数第二点一致,第0点cost为0,依次累加距离作为cost
 	}
 }
 
@@ -2871,7 +2871,7 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 	//Find before lanes
 	for(unsigned int il=0; il < lanes.size(); il ++)
 	{
-		if(lanes.at(il).fromIds.size() == 0)
+		if(lanes.at(il).fromIds.size() == 0)	// 起始lane
 		{
 			double closest_d = DBL_MAX;
 			Lane* pL = nullptr;
@@ -2880,7 +2880,7 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 			{
 				if(lanes.at(il).id == sp_lanes.at(l).id)
 				{
-					pFL = &sp_lanes.at(l);
+					pFL = &sp_lanes.at(l);			// 取得在sp_lanes中的起始lane的指针
 					break;
 				}
 			}
@@ -2889,10 +2889,10 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 			int closest_index = -1;
 			for(int l=0; l < sp_lanes.size(); l ++)
 			{
-				if(pFL->id != sp_lanes.at(l).id )
+				if(pFL->id != sp_lanes.at(l).id )		// 遍历所有航线,处理非起始航线
 				{
 					PlannerHNS::RelativeInfo info;
-					WayPoint lastofother = sp_lanes.at(l).points.at(sp_lanes.at(l).points.size()-1);
+					WayPoint lastofother = sp_lanes.at(l).points.at(sp_lanes.at(l).points.size()-1);		// 非起始lane的最后一个wp
 					PlanningHelpers::GetRelativeInfoLimited(sp_lanes.at(l).points, pFL->points.at(0), info, 0);
 					double back_distance = hypot(lastofother.pos.y - pFL->points.at(0).pos.y, lastofother.pos.x - pFL->points.at(0).pos.x);
 					bool bCloseFromBack = false;
