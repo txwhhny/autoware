@@ -467,13 +467,13 @@ public:
 	double perp_distance;		// 当前位姿与perp_point的距离
 	double to_front_distance; //negative // perp_point与p1的距离
 	double from_back_distance; // perp_point与p0的距离
-	int iFront;								// 距离当前位姿最近的航点,前面和后面
+	int iFront;								// 距离当前位姿最近的航点,前面和后面, 是lane的points的下标,不是nodeid
 	int iBack;
 	int iGlobalPath;
 	WayPoint perp_point;	// 当前位姿为原点,p1偏航为x正向的坐标系下,p0与p1连线在y轴的交点
 	double angle_diff; // degrees	// 当前位姿与p1的夹角
-	bool bBefore;
-	bool bAfter;
+	bool bBefore;				// 表示p点在lane的起点之前(第2点到第一点延长线的前部,虽然不一定在延长线上)
+	bool bAfter;				// 表示p点在lane的终点之后(倒数第2点到终点的延长线之后,不一定在延长线上)
 	double after_angle;	
 
 	RelativeInfo()

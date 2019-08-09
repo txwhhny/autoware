@@ -2309,7 +2309,7 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 	ConnectLanes(pLaneData, roadLanes);		// 设置lane之间的fromIds和toIds, 注意,这里的Ids都是点的原始所属laneid, 而不是合并后的laneid
 
 	cout << " >> Create Missing lane connections ... " << endl;
-	FixUnconnectedLanes(roadLanes);				// 还没看懂
+	FixUnconnectedLanes(roadLanes);				// 根据临近lane,确定是否可以分割合并lane
 	////FixTwoPointsLanes(roadLanes);
 
 	//map has one road segment
@@ -2330,29 +2330,29 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 
 	//Link Lanes and lane's waypoints by pointers
 	cout << " >> Link lanes and waypoints with pointers ... " << endl;
-	LinkLanesPointers(map);
+	LinkLanesPointers(map);		//根据fromIds和toIds设置fromLanes和toLanes以及pLane
 
 	for(unsigned int rs = 0; rs < map.roadSegments.size(); rs++)
 	{
 		for(unsigned int i =0; i < map.roadSegments.at(rs).Lanes.size(); i++)
 		{
 			Lane* pL = &map.roadSegments.at(rs).Lanes.at(i);
-			for(unsigned int j = 0 ; j < pL->points.size(); j++)
+			for(unsigned int j = 0 ; j < pL->points.size(); j++)		// 遍历pL中的所有点
 			{
-			    if(pL->points.at(j).actionCost.size() > 0)
+			  if(pL->points.at(j).actionCost.size() > 0)		// 这段代码写得比较有问题!!!! 
 			  {
-				  if(pL->points.at(j).actionCost.at(0).first == LEFT_TURN_ACTION)
+				  if(pL->points.at(j).actionCost.at(0).first == LEFT_TURN_ACTION)	// 某个点的满足这个条件
 					{
-					  AssignActionCostToLane(pL, LEFT_TURN_ACTION, LEFT_INITIAL_TURNS_COST);
+					  AssignActionCostToLane(pL, LEFT_TURN_ACTION, LEFT_INITIAL_TURNS_COST);	// 所有点都做相同处理.
 					  break;
 					}
 				  else if(pL->points.at(j).actionCost.at(0).first == RIGHT_TURN_ACTION)
 					{
 					  AssignActionCostToLane(pL, RIGHT_TURN_ACTION, RIGHT_INITIAL_TURNS_COST);
-					break;
+						break;
 
 					}
-				  }
+				}
 			}
 		}
 	}
@@ -2360,7 +2360,7 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 	if(bFindLaneChangeLanes)
 	{
 		cout << " >> Extract Lane Change Information... " << endl;
-		FindAdjacentLanesV2(map);
+		FindAdjacentLanesV2(map);		// 设置变道
 	}
 
 	//Extract Signals and StopLines
@@ -2866,12 +2866,12 @@ void MappingHelpers::InsertWayPointToFrontOfLane(const WayPoint& wp, Lane& lane,
 
 void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 {
-	std::vector<Lane> sp_lanes = lanes;
+	std::vector<Lane> sp_lanes = lanes;		// 复制一份方到sp_lanes
 	bool bAtleastOneChange = false;
 	//Find before lanes
 	for(unsigned int il=0; il < lanes.size(); il ++)
 	{
-		if(lanes.at(il).fromIds.size() == 0)	// 起始lane
+		if(lanes.at(il).fromIds.size() == 0)	// 找到fromIds为空的,用来试图找出可能的前置lane
 		{
 			double closest_d = DBL_MAX;
 			Lane* pL = nullptr;
@@ -2880,7 +2880,7 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 			{
 				if(lanes.at(il).id == sp_lanes.at(l).id)
 				{
-					pFL = &sp_lanes.at(l);			// 取得在sp_lanes中的起始lane的指针
+					pFL = &sp_lanes.at(l);			// 取得在sp_lanes中的起始lane的指针, 放到到pFL上
 					break;
 				}
 			}
@@ -2889,17 +2889,17 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 			int closest_index = -1;
 			for(int l=0; l < sp_lanes.size(); l ++)
 			{
-				if(pFL->id != sp_lanes.at(l).id )		// 遍历所有航线,处理非起始航线
+				if(pFL->id != sp_lanes.at(l).id )		// 遍历处理所有非pFL的lane
 				{
 					PlannerHNS::RelativeInfo info;
-					WayPoint lastofother = sp_lanes.at(l).points.at(sp_lanes.at(l).points.size()-1);		// 非起始lane的最后一个wp
+					WayPoint lastofother = sp_lanes.at(l).points.at(sp_lanes.at(l).points.size()-1);		// 非起始pFL的最后一个wp
 					PlanningHelpers::GetRelativeInfoLimited(sp_lanes.at(l).points, pFL->points.at(0), info, 0);
-					double back_distance = hypot(lastofother.pos.y - pFL->points.at(0).pos.y, lastofother.pos.x - pFL->points.at(0).pos.x);
+					double back_distance = hypot(lastofother.pos.y - pFL->points.at(0).pos.y, lastofother.pos.x - pFL->points.at(0).pos.x);	// 计算sp_lane(l)最后一个点和pFL起点的距离
 					bool bCloseFromBack = false;
-					if((info.bAfter == true && back_distance < 15.0) || info.bAfter == false)
+					if((info.bAfter == true && back_distance < 15.0) || info.bAfter == false)	// 如果pFL起点在lane的后部(bAfter=true), 则back_distance需小于15,
 						bCloseFromBack = true;
 
-
+					// 并且info.perp_distance也需小于2, perp_distance的意义看注释
 					if(fabs(info.perp_distance) < 2 && fabs(info.perp_distance) < closest_d && info.bBefore == false && bCloseFromBack)
 					{
 						closest_d = fabs(info.perp_distance);
@@ -2911,14 +2911,14 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 				}
 			}
 
-			if(pL != nullptr && pFL != nullptr)
+			if(pL != nullptr && pFL != nullptr)		// 如果pL不为空, 证明找到到了前置lane
 			{
-				if(closest_info.iFront == pL->points.size()-1)
+				if(closest_info.iFront == pL->points.size()-1)	// 起点的iFront刚好是pL的最后一个点, 完美连接
 				{
-					pL->toIds.push_back(pFL->id);
+					pL->toIds.push_back(pFL->id);		// 设置pL的toIds和pL最后一个点的toIds
 					pL->points.at(closest_info.iFront).toIds.push_back(pFL->points.at(0).id);
 
-					pFL->points.at(0).fromIds.push_back(pL->points.at(closest_info.iFront).id);
+					pFL->points.at(0).fromIds.push_back(pL->points.at(closest_info.iFront).id);	// 设置pFL的fromIds和pFL起点的fromIds
 					pFL->fromIds.push_back(pL->id);
 					bAtleastOneChange = true;
 					if(DEBUG_MAP_PARSING)
@@ -2927,17 +2927,17 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 						cout << "Don't Split , Perfect !" << endl;
 					}
 				}
-				else
+				else		// info.bAfter == false, 也就是iFront处于中间的情况就需要分割
 				{
 					 // split from previous point
 					if(DEBUG_MAP_PARSING)
 						cout << "Closest Next Lane For: " << pFL->id << " , Is:" << pL->id << ", Distance=" << fabs(closest_info.perp_distance) << ", Size: " << pL->points.size() << ", back_index: " << closest_info.iBack <<", front_index: " << closest_info.iFront << ", Direct: " << closest_info.angle_diff << endl;
 
-					Lane front_half, back_half;
-					front_half.points.insert(front_half.points.begin(), pL->points.begin()+closest_info.iFront, pL->points.end());
-					front_half.toIds = pL->toIds;
-					front_half.fromIds.push_back(pL->id);
-					front_half.id = front_half.points.at(0).originalMapID;
+					Lane front_half, back_half;	
+					front_half.points.insert(front_half.points.begin(), pL->points.begin()+closest_info.iFront, pL->points.end());	// 用iFront之后的点创建front_half
+					front_half.toIds = pL->toIds;		// 它的toIds等于pL的
+					front_half.fromIds.push_back(pL->id);	// 它的fromIds只有pL一个
+					front_half.id = front_half.points.at(0).originalMapID;	// 它的id等于起点的原始laneid
 					front_half.areaId = pL->areaId;
 					front_half.dir = pL->dir;
 					front_half.num = pL->num;
@@ -2946,11 +2946,11 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 					front_half.type = pL->type;
 					front_half.width = pL->width;
 
-					back_half.points.insert(back_half.points.begin(), pL->points.begin(), pL->points.begin()+closest_info.iFront);
-					back_half.toIds.clear();
-					back_half.toIds.push_back(front_half.id);
+					back_half.points.insert(back_half.points.begin(), pL->points.begin(), pL->points.begin()+closest_info.iFront);	// 用iFront之前的点创建back_half
+					back_half.toIds.clear();		// 它的toIds应该只有front_half和pFL两个
+					back_half.toIds.push_back(front_half.id);	
 					back_half.toIds.push_back(pFL->id);
-					back_half.fromIds = pL->fromIds;
+					back_half.fromIds = pL->fromIds;	// 它的fromIds等于pL的
 					back_half.id = pL->id;
 					back_half.areaId = pL->areaId;
 					back_half.dir = pL->dir;
@@ -2960,7 +2960,7 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 					back_half.type = pL->type;
 					back_half.width = pL->width;
 
-					WayPoint* last_from_back =  &back_half.points.at(back_half.points.size()-1);
+					WayPoint* last_from_back =  &back_half.points.at(back_half.points.size()-1);		// 处理一下分割处两个端点的toIds和fromIds
 					WayPoint* first_from_front =  &pFL->points.at(0);
 
 					last_from_back->toIds.push_back(first_from_front->id);
@@ -2971,18 +2971,18 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 						if(DEBUG_MAP_PARSING)
 							cout << "Split this one Nicely! first_half_size: " << front_half.points.size() << ", second_hald_size: " << back_half.points.size() << endl;
 
-						pFL->fromIds.push_back(back_half.id);
+						pFL->fromIds.push_back(back_half.id);		// 处理pFL的fromIds
 
-						if(closest_index >= 0)
+						if(closest_index >= 0)									// 删除掉被分割的lane??
 							sp_lanes.erase(sp_lanes.begin()+closest_index);
 						else
 							cout << "## Alert Alert Alert !!!! " << endl;
 
 						// add perp point to lane points
-						InsertWayPointToBackOfLane(closest_info.perp_point, front_half, g_max_point_id);
-						InsertWayPointToFrontOfLane(closest_info.perp_point, back_half, g_max_point_id);
+						InsertWayPointToBackOfLane(closest_info.perp_point, front_half, g_max_point_id);	// backOfLane的起点改为交点closest_info.perp_point
+						InsertWayPointToFrontOfLane(closest_info.perp_point, back_half, g_max_point_id);	// frontOfLane的终点改为交点,同上
 
-						sp_lanes.push_back(front_half);
+						sp_lanes.push_back(front_half);	// 相当于把删掉的替换为front_half和back_half
 						sp_lanes.push_back(back_half);
 						bAtleastOneChange = true;
 					}
@@ -3007,7 +3007,7 @@ void MappingHelpers::FixUnconnectedLanes(std::vector<Lane>& lanes)
 
 	for(unsigned int il=0; il < lanes.size(); il ++)
 	{
-		if(lanes.at(il).toIds.size() == 0)
+		if(lanes.at(il).toIds.size() == 0)			// toIds为空的,用来试图找出其后置lane, 以下分析与上述类似
 		{
 			double closest_d = DBL_MAX;
 			Lane* pL = nullptr;
@@ -3357,14 +3357,14 @@ void MappingHelpers::FindAdjacentLanesV2(RoadNetwork& map)
 				{
 					WayPoint* pWP = &pL->points.at(p);
 					RelativeInfo info;
-					PlanningHelpers::GetRelativeInfoLimited(pL2->points, *pWP, info);
+					PlanningHelpers::GetRelativeInfoLimited(pL2->points, *pWP, info);		// 获取pwp在pL2的RelativeInfo, info的意义看注释
 
 					if(!info.bAfter && !info.bBefore && fabs(info.perp_distance) > 1.2 && fabs(info.perp_distance) < 3.5 && UtilityH::AngleBetweenTwoAnglesPositive(info.perp_point.pos.a, pWP->pos.a) < 0.06)
 					{
 						WayPoint* pWP2 = &pL2->points.at(info.iFront);
-						if(info.perp_distance < 0)
+						if(info.perp_distance < 0)		// 小于0表示pWP2在pWp的右侧
 						{
-							if(pWP->pRight == 0)
+							if(pWP->pRight == 0)			// 设置pWP的右侧为pWP2
 							{
 								pWP->pRight = pWP2;
 								pWP->RightPointId = pWP2->id;
@@ -3373,7 +3373,7 @@ void MappingHelpers::FindAdjacentLanesV2(RoadNetwork& map)
 
 							}
 
-							if(pWP2->pLeft == 0)
+							if(pWP2->pLeft == 0)		// 设置pWP2的左侧为pWP
 							{
 								pWP2->pLeft = pWP;
 								pWP2->LeftPointId = pWP->id;
@@ -3381,7 +3381,7 @@ void MappingHelpers::FindAdjacentLanesV2(RoadNetwork& map)
 								pL2->pLeftLane = pL;
 							}
 						}
-						else
+						else		// 以下类似
 						{
 							if(pWP->pLeft == 0)
 							{

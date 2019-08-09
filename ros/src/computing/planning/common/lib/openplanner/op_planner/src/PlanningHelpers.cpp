@@ -132,7 +132,7 @@ bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, c
 	Mat3 invTranslationMat(p.pos.x, p.pos.y);
 
 	p0.pos = translationMat*p0.pos;		// 相当于以p为原点,以p1方位作为航向 
-	p0.pos = rotationMat*p0.pos;
+	p0.pos = rotationMat*p0.pos;			// 变换矩阵表示形式Mat3[row][col]
 
 	p1.pos = translationMat*p1.pos;
 	p1.pos = rotationMat*p1.pos;
@@ -320,7 +320,7 @@ bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajec
 			info.after_angle = diff_last_perp;
 			if(diff_last_perp > M_PI_2)		// 这个只原则上应该只有0和M_PI, 以最后一个点为分界,0表示info.perp_point和s-2同一侧, M_PI表示和s-2分别位于s-1的两侧
 			{
-				info.bAfter = true;
+				info.bAfter = true;		// 大于M_PI_2则说明info.perp_point在s-2到s-1的延长线上, 也就是info.bAfter = true
 			}
 
 		}
