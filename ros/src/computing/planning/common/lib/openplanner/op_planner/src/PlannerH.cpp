@@ -1,3 +1,12 @@
+/*
+ * @Description: 
+ * @version: 
+ * @Company: 
+ * @Author: hxc
+ * @Date: 2019-08-12 15:31:55
+ * @LastEditors: hxc
+ * @LastEditTime: 2019-08-12 15:31:55
+ */
 /// \file PlannerH.cpp
 /// \brief Main functions for path generation (global and local)
 /// \author Hatem Darweesh
@@ -38,7 +47,7 @@ void PlannerH::GenerateRunoffTrajectory(const std::vector<std::vector<WayPoint> 
 
 	sampledPoints_debug.clear(); //for visualization only
 
-	for(unsigned int i = 0; i < referencePaths.size(); i++)
+	for(unsigned int i = 0; i < referencePaths.size(); i++)		// 遍历局部路径集合
 	{
 		std::vector<std::vector<WayPoint> > local_rollOutPaths;
 		int s_index = 0, e_index = 0;

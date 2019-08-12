@@ -1,4 +1,13 @@
 /*
+ * @Description: 
+ * @version: 
+ * @Company: 
+ * @Author: hxc
+ * @Date: 2019-08-12 12:08:02
+ * @LastEditors: hxc
+ * @LastEditTime: 2019-08-12 15:18:34
+ */
+/*
  * Copyright 2018-2019 Autoware Foundation. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -113,7 +122,7 @@ void TrajectoryGen::UpdatePlanningParams(ros::NodeHandle& _nh)
 
 }
 
-void TrajectoryGen::callbackGetInitPose(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg)
+void TrajectoryGen::callbackGetInitPose(const geometry_msgs::PoseWithCovarianceStampedConstPtr &msg)		// 这里的pose是world坐标系下的
 {
 	if(!bInitPos)
 	{
@@ -126,7 +135,7 @@ void TrajectoryGen::callbackGetInitPose(const geometry_msgs::PoseWithCovarianceS
 	}
 }
 
-void TrajectoryGen::callbackGetCurrentPose(const geometry_msgs::PoseStampedConstPtr& msg)
+void TrajectoryGen::callbackGetCurrentPose(const geometry_msgs::PoseStampedConstPtr& msg)		// 这里的pose是map坐标系下的
 {
 	m_CurrentPos = PlannerHNS::WayPoint(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z, tf::getYaw(msg->pose.orientation));
 	m_InitPos = m_CurrentPos;
@@ -155,7 +164,7 @@ void TrajectoryGen::callbackGetCANInfo(const autoware_can_msgs::CANInfoConstPtr 
 void TrajectoryGen::callbackGetRobotOdom(const nav_msgs::OdometryConstPtr& msg)
 {
 	m_VehicleStatus.speed = msg->twist.twist.linear.x;
-	m_VehicleStatus.steer += atan(m_CarInfo.wheel_base * msg->twist.twist.angular.z/msg->twist.twist.linear.x);
+	m_VehicleStatus.steer += atan(m_CarInfo.wheel_base * msg->twist.twist.angular.z/msg->twist.twist.linear.x);		// (轴距 / 半径)-相当于车的航向?
 	UtilityHNS::UtilityH::GetTickCount(m_VehicleStatus.tStamp);
 	bVehicleStatus = true;
 }
@@ -170,14 +179,14 @@ void TrajectoryGen::callbackGetGlobalPlannerPath(const autoware_msgs::LaneArrayC
 
 		for(unsigned int i = 0 ; i < msg->lanes.size(); i++)
 		{
-			PlannerHNS::ROSHelpers::ConvertFromAutowareLaneToLocalLane(msg->lanes.at(i), m_temp_path);
+			PlannerHNS::ROSHelpers::ConvertFromAutowareLaneToLocalLane(msg->lanes.at(i), m_temp_path);	// 只是换个数据格式
 
 			PlannerHNS::PlanningHelpers::CalcAngleAndCost(m_temp_path);
 			m_GlobalPaths.push_back(m_temp_path);
 
 			if(bOldGlobalPath)
 			{
-				bOldGlobalPath = PlannerHNS::PlanningHelpers::CompareTrajectories(m_temp_path, m_GlobalPaths.at(i));
+				bOldGlobalPath = PlannerHNS::PlanningHelpers::CompareTrajectories(m_temp_path, m_GlobalPaths.at(i));	// 比较各航点的速度,坐标,经纬度是否相同
 			}
 		}
 
@@ -203,17 +212,17 @@ void TrajectoryGen::MainLoop()
 	{
 		ros::spinOnce();
 
-		if(bInitPos && m_GlobalPaths.size()>0)
+		if(bInitPos && m_GlobalPaths.size()>0)		// 设置了初始位置(或者有current_pose)和得到全局路径集合
 		{
 			m_GlobalPathSections.clear();
 
-			for(unsigned int i = 0; i < m_GlobalPaths.size(); i++)
+			for(unsigned int i = 0; i < m_GlobalPaths.size(); i++)		// 遍历全局路径
 			{
 				t_centerTrajectorySmoothed.clear();
 				PlannerHNS::PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(m_GlobalPaths.at(i), m_CurrentPos, m_PlanningParams.horizonDistance ,
-						m_PlanningParams.pathDensity ,t_centerTrajectorySmoothed);
+						m_PlanningParams.pathDensity ,t_centerTrajectorySmoothed);	// 找出最接近m_CurrentPos的航点,往后方10m,往前(m_PlanningParams.horizonDistance - 10)m,以m_PlanningParams.pathDensity为距离均匀处理,生成新的路径t_centerTrajectorySmoothed
 
-				m_GlobalPathSections.push_back(t_centerTrajectorySmoothed);
+				m_GlobalPathSections.push_back(t_centerTrajectorySmoothed);		// 对处理的片段保存到m_GlobalPathSections
 			}
 
 			std::vector<PlannerHNS::WayPoint> sampledPoints_debug;

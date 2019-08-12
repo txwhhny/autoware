@@ -1,3 +1,12 @@
+/*
+ * @Description: 
+ * @version: 
+ * @Company: 
+ * @Author: hxc
+ * @Date: 2019-08-12 14:33:28
+ * @LastEditors: hxc
+ * @LastEditTime: 2019-08-12 16:09:25
+ */
 
 /// \file PlanningHelpers.cpp
 /// \brief Helper functions for planning algorithms
@@ -687,8 +696,8 @@ int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajec
 
 		return min_index;
 }
-
-int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex )
+// 在trajectory中从prevIndex开始找出与p最接近, 且沿着处于前方的航点索引
+int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex )	// prevIndex默认值为0
 {
 	int size = (int)trajectory.size();
 
@@ -699,8 +708,8 @@ int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint
 
 	for(unsigned int i=prevIndex; i< size; i++)
 	{
-		d  = distance2pointsSqr(trajectory[i].pos, p.pos);
-		double angle_diff = UtilityH::AngleBetweenTwoAnglesPositive(trajectory[i].pos.a, p.pos.a)*RAD2DEG;
+		d  = distance2pointsSqr(trajectory[i].pos, p.pos);	// p到trajectory[i]的距离的平方
+		double angle_diff = UtilityH::AngleBetweenTwoAnglesPositive(trajectory[i].pos.a, p.pos.a)*RAD2DEG;	// 两个wp的夹角, 0~360
 
 		if(d < minD && angle_diff < 45)
 		{
@@ -709,17 +718,17 @@ int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint
 		}
 	}
 
-	if(min_index < (int)trajectory.size()-2)
+	if(min_index < (int)trajectory.size()-2)		// 是不是因该   min_index < (int)trajectory.size()-1  ???? 因为调用者要求min_index必须小于trajectory.size()-1
 	{
 		GPSPoint curr, next;
 		curr = trajectory.at(min_index).pos;
 		next = trajectory.at(min_index+1).pos;
 		GPSPoint v_1(p.pos.x - curr.x   ,p.pos.y - curr.y,0,0);
-		double norm1 = pointNorm(v_1);
+		double norm1 = pointNorm(v_1);		// current和p的距离
 		GPSPoint v_2(next.x - curr.x,next.y - curr.y,0,0);
-		double norm2 = pointNorm(v_2);
+		double norm2 = pointNorm(v_2);		// current和next的距离
 		double dot_pro = v_1.x*v_2.x + v_1.y*v_2.y;
-		double a = UtilityH::FixNegativeAngle(acos(dot_pro/(norm1*norm2)));
+		double a = UtilityH::FixNegativeAngle(acos(dot_pro/(norm1*norm2)));	// 向量点乘, 求出current-p的连线与current-next的连线形成的夹角
 		if(a <= M_PI_2)
 			min_index = min_index+1;
 	}
@@ -1151,35 +1160,35 @@ void PlanningHelpers::FixPathDensity(vector<WayPoint>& path, const double& dista
 	fixedPath.push_back(path.at(0));
 	for(unsigned int si = 0, ei=1; ei < path.size(); )
 	{
-		d += hypot(path.at(ei).pos.x- path.at(ei-1).pos.x, path.at(ei).pos.y- path.at(ei-1).pos.y) + remaining;
-		a = atan2(path.at(ei).pos.y - path.at(si).pos.y, path.at(ei).pos.x - path.at(si).pos.x);
+		d += hypot(path.at(ei).pos.x- path.at(ei-1).pos.x, path.at(ei).pos.y- path.at(ei-1).pos.y) + remaining;	// 从第0点开始,累加相邻两个点的距离及剩余的部分remaining
+		a = atan2(path.at(ei).pos.y - path.at(si).pos.y, path.at(ei).pos.x - path.at(si).pos.x);	// 一直计算从ei到si连线与x轴的夹角
 
-		if(d < distanceDensity - margin ) // skip
+		if(d < distanceDensity - margin ) // skip	// 距离还没超过distanceDensity, 就直接跳过
 		{
 			ei++;
 			remaining = 0;
 		}
-		else if(d > (distanceDensity +  margin)) // skip
+		else if(d > (distanceDensity +  margin)) // skip		// 距离超过阈值
 		{
 			WayPoint pm = path.at(si);
-			nPoints = d  / distanceDensity;
+			nPoints = d  / distanceDensity;		// 需要补充的航点数量
 			for(int k = 0; k < nPoints; k++)
 			{
-				pm.pos.x = pm.pos.x + distanceDensity * cos(a);
+				pm.pos.x = pm.pos.x + distanceDensity * cos(a);	// 从si开始补充
 				pm.pos.y = pm.pos.y + distanceDensity * sin(a);
 				fixedPath.push_back(pm);
 			}
-			remaining = d - nPoints*distanceDensity;
+			remaining = d - nPoints*distanceDensity;		// 求出剩余的距离
 			si++;
-			path.at(si).pos = pm.pos;
+			path.at(si).pos = pm.pos;		// 修正si所在位置的航点为pm, 下次补充则从此处开始
 			d = 0;
 			ei++;
 		}
-		else
+		else			// d介于阈值之间
 		{
 			d = 0;
 			remaining = 0;
-			fixedPath.push_back(path.at(ei));
+			fixedPath.push_back(path.at(ei));	// 直接采用, 并设置si为ei-1
 			ei++;
 			si = ei - 1;
 		}
@@ -1427,18 +1436,18 @@ void PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(const vector<W
 
 	extractedPath.clear();
 
-	int close_index = GetClosestNextPointIndexDirectionFast(originalPath, pos);
+	int close_index = GetClosestNextPointIndexDirectionFast(originalPath, pos);		// 找到与pos最接近的航点索引,该索引最大只能是originalPath.size() - 2
 	double d = 0;
 
-	if(close_index + 1 >= originalPath.size())
+	if(close_index + 1 >= originalPath.size())		// 再次限定close_index最大只能是originalPath.size() - 2
 		close_index = originalPath.size() - 2;
 
 	for(int i=close_index; i >=  0; i--)
 	{
-		extractedPath.insert(extractedPath.begin(),  originalPath.at(i));
-		if(i < originalPath.size())
-			d += hypot(originalPath.at(i).pos.y - originalPath.at(i+1).pos.y, originalPath.at(i).pos.x - originalPath.at(i+1).pos.x);
-		if(d > 10)
+		extractedPath.insert(extractedPath.begin(),  originalPath.at(i));	// 总是在extractedPath前部插入originalPath的元素,因为i是递减的,这样保证顺序
+		if(i < originalPath.size())		// 这里是否应该是i < originalPath.size() - 1, 因为底下句子出现i+1, 虽说前面有限定,但是这里这么写有点奇怪
+			d += hypot(originalPath.at(i).pos.y - originalPath.at(i+1).pos.y, originalPath.at(i).pos.x - originalPath.at(i+1).pos.x);	// 累加originalPath.at(i)到下一个点的距离
+		if(d > 10)		
 			break;
 	}
 
@@ -1446,10 +1455,10 @@ void PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(const vector<W
 	d = 0;
 	for(int i=close_index+1; i < (int)originalPath.size(); i++)
 	{
-		extractedPath.push_back(originalPath.at(i));
+		extractedPath.push_back(originalPath.at(i));	// 总是push_back, 因为现在i是递增
 		if(i > 0)
 			d += hypot(originalPath.at(i).pos.y - originalPath.at(i-1).pos.y, originalPath.at(i).pos.x - originalPath.at(i-1).pos.x);
-		if(d > minDistance)
+		if(d > minDistance)		// 感觉close_index到close_index+1之间的距离算了两次, 累加到d上了  // 因为上面, 所以minDistance正常来讲应该是大于10
 			break;
 	}
 
@@ -1459,8 +1468,8 @@ void PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(const vector<W
 		return;
 	}
 
-	FixPathDensity(extractedPath, pathDensity);
-	CalcAngleAndCost(extractedPath);
+	FixPathDensity(extractedPath, pathDensity);		// 均匀分布路径上的点,而不只是简单的使用原有的waypoint, 距离为pathDensity
+	CalcAngleAndCost(extractedPath);		// 计算extractedPath的航点航向及代价
 }
 
 void PlanningHelpers::ExtractPartFromPointToDistanceFast(const vector<WayPoint>& originalPath, const WayPoint& pos, const double& minDistance,
@@ -1504,11 +1513,11 @@ void PlanningHelpers::ExtractPartFromPointToDistanceFast(const vector<WayPoint>&
 }
 
 void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const double& speed, const vector<WayPoint>& originalCenter, int& start_index,
-		int& end_index, vector<double>& end_laterals ,
-		vector<vector<WayPoint> >& rollInPaths, const double& max_roll_distance,
+		int& end_index, vector<double>& end_laterals ,															// 关键入参 carPos originalCenter
+		vector<vector<WayPoint> >& rollInPaths, const double& max_roll_distance,				// rollInPath 关键出参
 		const double& maxSpeed, const double&  carTipMargin, const double& rollInMargin,
 		const double& rollInSpeedFactor, const double& pathDensity, const double& rollOutDensity,
-		const int& rollOutNumber, const double& SmoothDataWeight, const double& SmoothWeight,
+		const int& rollOutNumber, const double& SmoothDataWeight, const double& SmoothWeight,		// rollOutNumber 关键入参6
 		const double& SmoothTolerance, const bool& bHeadingSmooth,
 		std::vector<WayPoint>& sampledPoints)
 {
@@ -1524,7 +1533,7 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	GetRelativeInfo(originalCenter, carPos, info);
 	double remaining_distance = 0;
 	int close_index = info.iBack;
-	for(unsigned int i=close_index; i< originalCenter.size()-1; i++)
+	for(unsigned int i=close_index; i< originalCenter.size()-1; i++)		// 计算从info.iBack到该航线(就是之前的航线处理过的航线片段)结束的距离累加
 	  {
 		if(i>0)
 			remaining_distance += distance2points(originalCenter[i].pos, originalCenter[i+1].pos);
@@ -1570,7 +1579,7 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 		start_distance = remaining_distance;
 
 	d_limit = 0;
-	for(unsigned int i=close_index; i< originalCenter.size(); i++)
+	for(unsigned int i=close_index; i< originalCenter.size(); i++)		// 与前面的差别是向前计算, 多计算了一个close_index到close-1的距离
 	  {
 		  if(i>0)
 			  d_limit += distance2points(originalCenter[i].pos, originalCenter[i-1].pos);
