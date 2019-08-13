@@ -5,7 +5,7 @@
  * @Author: hxc
  * @Date: 2019-08-12 14:33:28
  * @LastEditors: hxc
- * @LastEditTime: 2019-08-12 16:09:25
+ * @LastEditTime: 2019-08-13 18:42:38
  */
 
 /// \file PlanningHelpers.cpp
@@ -1524,21 +1524,21 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	WayPoint p;
 	double dummyd = 0;
 
-	int iLimitIndex = (carTipMargin/0.3)/pathDensity;
-	if(iLimitIndex >= originalCenter.size())
-		iLimitIndex = originalCenter.size() - 1;
+	int iLimitIndex = (carTipMargin/0.3)/pathDensity;	// 默认参数取值 carTipMargin:4, pathDensity: 0.5
+	if(iLimitIndex >= originalCenter.size())					// originalCenter:局部路径(就是之前的航线处理过的航线片段)
+		iLimitIndex = originalCenter.size() - 1;	
 
 	//Get Closest Index
 	RelativeInfo info;
 	GetRelativeInfo(originalCenter, carPos, info);
 	double remaining_distance = 0;
-	int close_index = info.iBack;
-	for(unsigned int i=close_index; i< originalCenter.size()-1; i++)		// 计算从info.iBack到该航线(就是之前的航线处理过的航线片段)结束的距离累加
+	int close_index = info.iBack;											// close_index: 最接近carPos的背后航点索引
+	for(unsigned int i=close_index; i< originalCenter.size()-1; i++)		// 计算从info.iBack到该局部路径结束的距离累加
 	  {
 		if(i>0)
 			remaining_distance += distance2points(originalCenter[i].pos, originalCenter[i+1].pos);
 	  }
-
+	// initial_roll_in_distance : 从carPos并入局部路径的"垂直"距离,之所以加引号是因为是perp_distance
 	double initial_roll_in_distance = info.perp_distance ; //GetPerpDistanceToTrajectorySimple(originalCenter, carPos, close_index);
 
 
@@ -1573,10 +1573,10 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	double d_limit = 0;
 	unsigned int far_index = close_index;
 
-	//calculate end index
-	double start_distance = rollInSpeedFactor*speed+rollInMargin;
+	//calculate end index			// start_distance: 从carPos并入局部路径的拟合距离
+	double start_distance = rollInSpeedFactor*speed+rollInMargin;		// rollInSpeedFactor:速度因子,猜测"转弯"时速度需减小,所以乘以一个因数,0 < x <= 1, 这里是0.25, rollInMargin:16
 	if(start_distance > remaining_distance)
-		start_distance = remaining_distance;
+		start_distance = remaining_distance;			// 选择小的作为carPos到航线拟合过程的距离
 
 	d_limit = 0;
 	for(unsigned int i=close_index; i< originalCenter.size(); i++)		// 与前面的差别是向前计算, 多计算了一个close_index到close-1的距离
@@ -1586,16 +1586,16 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 
 		  if(d_limit >= start_distance)
 		  {
-			  far_index = i;
+			  far_index = i;			// 找到start_index开始与拟合距离相对应的长度对应的index, 放入end_index
 			  break;
 		  }
 	  }
 
-	int centralTrajectoryIndex = rollOutNumber/2;
-	vector<double> end_distance_list;
+	int centralTrajectoryIndex = rollOutNumber/2;	// rollOutNumber : 6
+	vector<double> end_distance_list;			// 构造7个数据, -1.5, -1, -0.5, 0, 0.5, 1, 1.5
 	for(int i=0; i< rollOutNumber+1; i++)
 	  {
-		  double end_roll_in_distance = rollOutDensity*(i - centralTrajectoryIndex);
+		  double end_roll_in_distance = rollOutDensity*(i - centralTrajectoryIndex);	// rollOutDensity : 0.5
 		  end_distance_list.push_back(end_roll_in_distance);
 	  }
 
@@ -1605,10 +1605,10 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 
 	//calculate the actual calculation starting index
 	d_limit = 0;
-	unsigned int smoothing_start_index = start_index;
+	unsigned int smoothing_start_index = start_index;		// 平滑处理的起始终止index
 	unsigned int smoothing_end_index = end_index;
 
-	for(unsigned int i=smoothing_start_index; i< originalCenter.size(); i++)
+	for(unsigned int i=smoothing_start_index; i< originalCenter.size(); i++)			// 以下两个for,根据carTipMargin计算进入和出去的拟合index
 	{
 		if(i > 0)
 			d_limit += distance2points(originalCenter[i].pos, originalCenter[i-1].pos);
@@ -1629,7 +1629,7 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 		smoothing_end_index++;
 	}
 
-	int nSteps = end_index - smoothing_start_index;
+	int nSteps = end_index - smoothing_start_index;		// 两段平滑处理的间距, 两段平滑处理(start_index->smothing_start_index, end_index->smothing_end_index)
 
 
 	vector<double> inc_list;
@@ -1637,10 +1637,10 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	vector<double> inc_list_inc;
 	for(int i=0; i< rollOutNumber+1; i++)
 	{
-		double diff = end_laterals.at(i)-initial_roll_in_distance;
-		inc_list.push_back(diff/(double)nSteps);
-		rollInPaths.push_back(vector<WayPoint>());
-		inc_list_inc.push_back(0);
+		double diff = end_laterals.at(i)-initial_roll_in_distance;	// 7条路线分别跟initial_roll_in_distance的偏移,当initial_roll_in_distance为0才是对称
+		inc_list.push_back(diff/(double)nSteps);		// 依次保存7条路线同initial_roll_in_distance的间距的单位步长增量
+		rollInPaths.push_back(vector<WayPoint>());	// 预留每一条路线
+		inc_list_inc.push_back(0);									// 累计增量
 	}
 
 
@@ -1652,13 +1652,13 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 
 
 	//Insert First strait points within the tip of the car range
-	for(unsigned int j = start_index; j < smoothing_start_index; j++)
+	for(unsigned int j = start_index; j < smoothing_start_index; j++)		// start_index->smoothing_start_index
 	{
 		p = originalCenter.at(j);
 		double original_speed = p.v;
 	  for(unsigned int i=0; i< rollOutNumber+1 ; i++)
 	  {
-		  p.pos.x = originalCenter.at(j).pos.x -  initial_roll_in_distance*cos(p.pos.a + M_PI_2);
+		  p.pos.x = originalCenter.at(j).pos.x -  initial_roll_in_distance*cos(p.pos.a + M_PI_2); // 类似坐标变换, 相当于假设originalCenter.at(j)在carPos坐标系下, 变换到航线所在坐标系下
 		  p.pos.y = originalCenter.at(j).pos.y -  initial_roll_in_distance*sin(p.pos.a + M_PI_2);
 		  if(i!=centralTrajectoryIndex)
 			  p.v = original_speed * LANE_CHANGE_SPEED_FACTOR;
@@ -1674,7 +1674,7 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 	  }
 	}
 
-	for(unsigned int j = smoothing_start_index; j < end_index; j++)
+	for(unsigned int j = smoothing_start_index; j < end_index; j++)		// smoothing_start_index->end_index, 真正的平滑处理阶段
 	  {
 		  p = originalCenter.at(j);
 		  double original_speed = p.v;
@@ -1682,8 +1682,8 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 		  {
 			  inc_list_inc[i] += inc_list[i];
 			  double d = inc_list_inc[i];
-			  p.pos.x = originalCenter.at(j).pos.x -  initial_roll_in_distance*cos(p.pos.a + M_PI_2) - d*cos(p.pos.a+ M_PI_2);
-			  p.pos.y = originalCenter.at(j).pos.y -  initial_roll_in_distance*sin(p.pos.a + M_PI_2) - d*sin(p.pos.a+ M_PI_2);
+			  p.pos.x = originalCenter.at(j).pos.x -  initial_roll_in_distance*cos(p.pos.a + M_PI_2) - d*cos(p.pos.a+ M_PI_2);	// d:即7条航线分别和initial_roll_in_distance的累积差值
+			  p.pos.y = originalCenter.at(j).pos.y -  initial_roll_in_distance*sin(p.pos.a + M_PI_2) - d*sin(p.pos.a+ M_PI_2);	// 当j==end_index-1时,initial_roll_in_distance + d等价于end_laterals
 			  if(i!=centralTrajectoryIndex)
 				  p.v = original_speed * LANE_CHANGE_SPEED_FACTOR;
 			  else
@@ -1702,7 +1702,7 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 		double original_speed = p.v;
 	  for(unsigned int i=0; i< rollOutNumber+1 ; i++)
 	  {
-		  double d = end_laterals.at(i);
+		  double d = end_laterals.at(i);			// 注意,这里的d直接取的end_laterals, 而不是inc_list构造的, 等价于上个循环j==end_index-1时的d
 		  p.pos.x  = originalCenter.at(j).pos.x - d*cos(p.pos.a + M_PI_2);
 		  p.pos.y  = originalCenter.at(j).pos.y - d*sin(p.pos.a + M_PI_2);
 		  if(i!=centralTrajectoryIndex)
@@ -1738,7 +1738,7 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 		if(j > 0)
 			d_limit += distance2points(originalCenter.at(j).pos, originalCenter.at(j-1).pos);
 
-		if(d_limit > max_roll_distance)
+		if(d_limit > max_roll_distance)		// 如果还没到达max_roll_distance,就继续构造后面的7条航线的剩余部分
 			break;
 
 			p = originalCenter.at(j);
@@ -1762,7 +1762,7 @@ void PlanningHelpers::CalculateRollInTrajectories(const WayPoint& carPos, const 
 
 	for(unsigned int i=0; i< rollOutNumber+1 ; i++)
 	{
-		SmoothPath(rollInPaths.at(i), SmoothDataWeight, SmoothWeight, SmoothTolerance);
+		SmoothPath(rollInPaths.at(i), SmoothDataWeight, SmoothWeight, SmoothTolerance);		// 平滑处理
 	}
 
 //	for(unsigned int i=0; i< rollInPaths.size(); i++)

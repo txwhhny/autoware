@@ -5,7 +5,7 @@
  * @Author: hxc
  * @Date: 2019-08-12 12:08:02
  * @LastEditors: hxc
- * @LastEditTime: 2019-08-12 15:18:34
+ * @LastEditTime: 2019-08-13 08:35:12
  */
 /*
  * Copyright 2018-2019 Autoware Foundation. All rights reserved.
@@ -186,7 +186,7 @@ void TrajectoryGen::callbackGetGlobalPlannerPath(const autoware_msgs::LaneArrayC
 
 			if(bOldGlobalPath)
 			{
-				bOldGlobalPath = PlannerHNS::PlanningHelpers::CompareTrajectories(m_temp_path, m_GlobalPaths.at(i));	// 比较各航点的速度,坐标,经纬度是否相同
+				bOldGlobalPath = PlannerHNS::PlanningHelpers::CompareTrajectories(m_temp_path, m_GlobalPaths.at(i));	// 比较各航点的速度,坐标,经纬度是否相同, 用来判断航线是否变了
 			}
 		}
 
@@ -216,7 +216,7 @@ void TrajectoryGen::MainLoop()
 		{
 			m_GlobalPathSections.clear();
 
-			for(unsigned int i = 0; i < m_GlobalPaths.size(); i++)		// 遍历全局路径
+			for(unsigned int i = 0; i < m_GlobalPaths.size(); i++)		// 遍历全局路径集合
 			{
 				t_centerTrajectorySmoothed.clear();
 				PlannerHNS::PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(m_GlobalPaths.at(i), m_CurrentPos, m_PlanningParams.horizonDistance ,
