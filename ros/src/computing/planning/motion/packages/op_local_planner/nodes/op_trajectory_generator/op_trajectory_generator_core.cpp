@@ -70,44 +70,44 @@ TrajectoryGen::~TrajectoryGen()
 
 void TrajectoryGen::UpdatePlanningParams(ros::NodeHandle& _nh)
 {
-	_nh.getParam("/op_trajectory_generator/samplingTipMargin", m_PlanningParams.carTipMargin);
-	_nh.getParam("/op_trajectory_generator/samplingOutMargin", m_PlanningParams.rollInMargin);
-	_nh.getParam("/op_trajectory_generator/samplingSpeedFactor", m_PlanningParams.rollInSpeedFactor);
-	_nh.getParam("/op_trajectory_generator/enableHeadingSmoothing", m_PlanningParams.enableHeadingSmoothing);
+	_nh.getParam("/op_trajectory_generator/samplingTipMargin", m_PlanningParams.carTipMargin);		// 从车辆中心点到水平采样的起点，这部分的长度决定了车辆切换不同轨迹的平滑程度
+	_nh.getParam("/op_trajectory_generator/samplingOutMargin", m_PlanningParams.rollInMargin);	//从水平采样的起点到平行采样的起点，这部分的长度和车辆速度密切相关，车辆速度越快，rollin部分应越长，使得轨迹更加平滑。
+	_nh.getParam("/op_trajectory_generator/samplingSpeedFactor", m_PlanningParams.rollInSpeedFactor);	// 速度因子, 该值*当前车速(如ndt_matching给出的速度)+m_PlanningParams.rollInMargin作为真实的rollin进行计算
+	_nh.getParam("/op_trajectory_generator/enableHeadingSmoothing", m_PlanningParams.enableHeadingSmoothing);	// 暂未使用,那部分代码被注释掉了
 
-	_nh.getParam("/op_common_params/enableSwerving", m_PlanningParams.enableSwerving);
+	_nh.getParam("/op_common_params/enableSwerving", m_PlanningParams.enableSwerving);					// 是否可以急转弯, 应该为true, 故意"基本未使用"
 	if(m_PlanningParams.enableSwerving)
 		m_PlanningParams.enableFollowing = true;
 	else
-		_nh.getParam("/op_common_params/enableFollowing", m_PlanningParams.enableFollowing);
+		_nh.getParam("/op_common_params/enableFollowing", m_PlanningParams.enableFollowing);		// 未使用
 
-	_nh.getParam("/op_common_params/enableTrafficLightBehavior", m_PlanningParams.enableTrafficLightBehavior);
-	_nh.getParam("/op_common_params/enableStopSignBehavior", m_PlanningParams.enableStopSignBehavior);
+	_nh.getParam("/op_common_params/enableTrafficLightBehavior", m_PlanningParams.enableTrafficLightBehavior);	// 未使用
+	_nh.getParam("/op_common_params/enableStopSignBehavior", m_PlanningParams.enableStopSignBehavior);	// 未使用
 
-	_nh.getParam("/op_common_params/maxVelocity", m_PlanningParams.maxSpeed);
-	_nh.getParam("/op_common_params/minVelocity", m_PlanningParams.minSpeed);
-	_nh.getParam("/op_common_params/maxLocalPlanDistance", m_PlanningParams.microPlanDistance);
+	_nh.getParam("/op_common_params/maxVelocity", m_PlanningParams.maxSpeed);		// 未使用
+	_nh.getParam("/op_common_params/minVelocity", m_PlanningParams.minSpeed);		// 未使用
+	_nh.getParam("/op_common_params/maxLocalPlanDistance", m_PlanningParams.microPlanDistance);		// rollout部分的距离, 也就是规划出来的候选轨迹到了平行区域之后的距离
 
-	_nh.getParam("/op_common_params/pathDensity", m_PlanningParams.pathDensity);
-	_nh.getParam("/op_common_params/rollOutDensity", m_PlanningParams.rollOutDensity);
+	_nh.getParam("/op_common_params/pathDensity", m_PlanningParams.pathDensity);						// tracjectory轨迹点的密集程度,也就是点的间距,处理成均匀的
+	_nh.getParam("/op_common_params/rollOutDensity", m_PlanningParams.rollOutDensity);			// rollout部分的间距, 也就是候选轨迹平行线之间的间距
 	if(m_PlanningParams.enableSwerving)
-		_nh.getParam("/op_common_params/rollOutsNumber", m_PlanningParams.rollOutNumber);
+		_nh.getParam("/op_common_params/rollOutsNumber", m_PlanningParams.rollOutNumber);			// 规划的路径数量是该值+1
 	else
 		m_PlanningParams.rollOutNumber = 0;
 
-	_nh.getParam("/op_common_params/horizonDistance", m_PlanningParams.horizonDistance);
-	_nh.getParam("/op_common_params/minFollowingDistance", m_PlanningParams.minFollowingDistance);
-	_nh.getParam("/op_common_params/minDistanceToAvoid", m_PlanningParams.minDistanceToAvoid);
-	_nh.getParam("/op_common_params/maxDistanceToAvoid", m_PlanningParams.maxDistanceToAvoid);
-	_nh.getParam("/op_common_params/speedProfileFactor", m_PlanningParams.speedProfileFactor);
+	_nh.getParam("/op_common_params/horizonDistance", m_PlanningParams.horizonDistance);		// 局部路径最大距离
+	_nh.getParam("/op_common_params/minFollowingDistance", m_PlanningParams.minFollowingDistance);	// 未使用
+	_nh.getParam("/op_common_params/minDistanceToAvoid", m_PlanningParams.minDistanceToAvoid);		  // 未使用
+	_nh.getParam("/op_common_params/maxDistanceToAvoid", m_PlanningParams.maxDistanceToAvoid);			// 未使用
+	_nh.getParam("/op_common_params/speedProfileFactor", m_PlanningParams.speedProfileFactor);			// 未使用
 
-	_nh.getParam("/op_common_params/smoothingDataWeight", m_PlanningParams.smoothingDataWeight);
-	_nh.getParam("/op_common_params/smoothingSmoothWeight", m_PlanningParams.smoothingSmoothWeight);
+	_nh.getParam("/op_common_params/smoothingDataWeight", m_PlanningParams.smoothingDataWeight);		// 平滑处理是迭代多次的, 相当于一个因子, factor*(处理前-处理后)
+	_nh.getParam("/op_common_params/smoothingSmoothWeight", m_PlanningParams.smoothingSmoothWeight);// 平滑处理中, 相当于一个因子, factor*((前一点+后一点))-2当前点)
 
-	_nh.getParam("/op_common_params/horizontalSafetyDistance", m_PlanningParams.horizontalSafetyDistancel);
-	_nh.getParam("/op_common_params/verticalSafetyDistance", m_PlanningParams.verticalSafetyDistance);
+	_nh.getParam("/op_common_params/horizontalSafetyDistance", m_PlanningParams.horizontalSafetyDistancel);	// 未使用
+	_nh.getParam("/op_common_params/verticalSafetyDistance", m_PlanningParams.verticalSafetyDistance);	// 未使用
 
-	_nh.getParam("/op_common_params/enableLaneChange", m_PlanningParams.enableLaneChange);
+	_nh.getParam("/op_common_params/enableLaneChange", m_PlanningParams.enableLaneChange);	// 未使用
 
 	_nh.getParam("/op_common_params/width", m_CarInfo.width);
 	_nh.getParam("/op_common_params/length", m_CarInfo.length);
@@ -148,7 +148,7 @@ void TrajectoryGen::callbackGetVehicleStatus(const geometry_msgs::TwistStampedCo
 	m_VehicleStatus.speed = msg->twist.linear.x;
 	m_CurrentPos.v = m_VehicleStatus.speed;
 	if(fabs(msg->twist.linear.x) > 0.25)
-		m_VehicleStatus.steer = atan(m_CarInfo.wheel_base * msg->twist.angular.z/msg->twist.linear.x);
+		m_VehicleStatus.steer = atan(m_CarInfo.wheel_base * msg->twist.angular.z/msg->twist.linear.x);		// 轴距 / 转弯半径, 转弯角度?
 	UtilityHNS::UtilityH::GetTickCount(m_VehicleStatus.tStamp);
 	bVehicleStatus = true;
 }
@@ -240,7 +240,7 @@ void TrajectoryGen::MainLoop()
 								m_PlanningParams.rollOutNumber,
 								m_PlanningParams.smoothingDataWeight,
 								m_PlanningParams.smoothingSmoothWeight,
-								m_PlanningParams.smoothingToleranceError,
+								m_PlanningParams.smoothingToleranceError,			// 公差默认为0.05
 								m_PlanningParams.speedProfileFactor,
 								m_PlanningParams.enableHeadingSmoothing,
 								-1 , -1,
@@ -251,9 +251,9 @@ void TrajectoryGen::MainLoop()
 			{
 				for(unsigned int j=0; j < m_RollOuts.at(i).size(); j++)
 				{
-					autoware_msgs::Lane lane;
+					autoware_msgs::Lane lane;		// PredictConstantTimeCostForTrajectory:根据当m_CurrentPos的当前车速,估计轨迹上各个航点的timecost
 					PlannerHNS::PlanningHelpers::PredictConstantTimeCostForTrajectory(m_RollOuts.at(i).at(j), m_CurrentPos, m_PlanningParams.minSpeed, m_PlanningParams.microPlanDistance);
-					PlannerHNS::ROSHelpers::ConvertFromLocalLaneToAutowareLane(m_RollOuts.at(i).at(j), lane);
+					PlannerHNS::ROSHelpers::ConvertFromLocalLaneToAutowareLane(m_RollOuts.at(i).at(j), lane);		// 转换成ros消息, 发布出来
 					lane.closest_object_distance = 0;
 					lane.closest_object_velocity = 0;
 					lane.cost = 0;

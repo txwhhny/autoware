@@ -718,7 +718,7 @@ int PlanningHelpers::GetClosestNextPointIndexDirectionFast(const vector<WayPoint
 		}
 	}
 
-	if(min_index < (int)trajectory.size()-2)		// 是不是因该   min_index < (int)trajectory.size()-1  ???? 因为调用者要求min_index必须小于trajectory.size()-1
+	if(min_index < (int)trajectory.size()-2)		// 是不是应该   min_index < (int)trajectory.size()-1  ???? 因为调用者要求min_index必须小于trajectory.size()-1
 	{
 		GPSPoint curr, next;
 		curr = trajectory.at(min_index).pos;
@@ -1216,7 +1216,7 @@ void PlanningHelpers::SmoothPath(vector<WayPoint>& path, double weight_data,
 
 	int size = path_in.size();
 
-	while (change >= tolerance)
+	while (change >= tolerance)		// 累积修改量大于公差,则继续处理
 	{
 		change = 0.0;
 		for (int i = 1; i < size - 1; i++)

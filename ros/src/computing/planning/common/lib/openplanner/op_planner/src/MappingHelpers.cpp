@@ -2330,7 +2330,7 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 
 	//Link Lanes and lane's waypoints by pointers
 	cout << " >> Link lanes and waypoints with pointers ... " << endl;
-	LinkLanesPointers(map);		//根据fromIds和toIds设置fromLanes和toLanes以及pLane
+	LinkLanesPointers(map);		//根据fromIds和toIds设置fromLanes和toLanes以及pLane,也就是设置指针
 
 	for(unsigned int rs = 0; rs < map.roadSegments.size(); rs++)
 	{
@@ -2360,7 +2360,7 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 	if(bFindLaneChangeLanes)
 	{
 		cout << " >> Extract Lane Change Information... " << endl;
-		FindAdjacentLanesV2(map);		// 设置变道
+		FindAdjacentLanesV2(map);		// 主要根据RelativeInfo的相对位置, 设置车道的左右临近车道,设置变道信息
 	}
 
 	//Extract Signals and StopLines
