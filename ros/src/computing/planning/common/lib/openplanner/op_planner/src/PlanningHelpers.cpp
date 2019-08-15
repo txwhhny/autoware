@@ -1,13 +1,3 @@
-/*
- * @Description: 
- * @version: 
- * @Company: 
- * @Author: hxc
- * @Date: 2019-08-12 14:33:28
- * @LastEditors: hxc
- * @LastEditTime: 2019-08-13 18:42:38
- */
-
 /// \file PlanningHelpers.cpp
 /// \brief Helper functions for planning algorithms
 /// \author Hatem Darweesh
@@ -428,11 +418,11 @@ double PlanningHelpers::GetExactDistanceOnTrajectory(const std::vector<WayPoint>
 {
 	if(trajectory.size() == 0) return 0;
 
-	if(p2.iFront == p1.iFront && p2.iBack == p1.iBack)
+	if(p2.iFront == p1.iFront && p2.iBack == p1.iBack)	//如果两个RelativeInfo的front和back相同, 直接如下相减,    但是感觉应该加个负号!!!!
 	{
 		return p2.to_front_distance - p1.to_front_distance;
 	}
-	else if(p2.iBack >= p1.iFront)
+	else if(p2.iBack >= p1.iFront)		// 沿路径方向, p2在p1的前方
 	{
 		double d_on_path = p1.to_front_distance + p2.from_back_distance;
 		for(int i = p1.iFront; i < p2.iBack; i++)
@@ -440,7 +430,7 @@ double PlanningHelpers::GetExactDistanceOnTrajectory(const std::vector<WayPoint>
 
 		return d_on_path;
 	}
-	else if(p2.iFront <= p1.iBack)
+	else if(p2.iFront <= p1.iBack)	// 沿路径方向, p2在p1的后方
 	{
 		double d_on_path = p1.from_back_distance + p2.to_front_distance;
 		for(int i = p2.iFront; i < p1.iBack; i++)

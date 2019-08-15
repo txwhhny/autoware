@@ -1129,19 +1129,19 @@ class TrajectoryCost
 public:
 	int index;
 	int relative_index;
-	double closest_obj_velocity;
-	double distance_from_center;
+	double closest_obj_velocity;		// 接近障碍物时的速度
+	double distance_from_center;		// 到中心线的距离,有正负
 	double priority_cost; //0 to 1
 	double transition_cost; // 0 to 1
 	double closest_obj_cost; // 0 to 1
 	double cost;
-	double closest_obj_distance;
+	double closest_obj_distance;		// 最接近障碍物的距离, "垂直距离"
 
 	int lane_index;
 	double lane_change_cost;
 	double lateral_cost;
 	double longitudinal_cost;
-	bool bBlocked;
+	bool bBlocked;								// 是否可同行
 	std::vector<std::pair<int, double> > lateral_costs;
 
 

@@ -69,9 +69,9 @@ TrajectoryEval::~TrajectoryEval()
 
 void TrajectoryEval::UpdatePlanningParams(ros::NodeHandle& _nh)
 {
-	_nh.getParam("/op_trajectory_evaluator/enablePrediction", m_bUseMoveingObjectsPrediction);
+	_nh.getParam("/op_trajectory_evaluator/enablePrediction", m_bUseMoveingObjectsPrediction);		// 是否使用动态预测
 
-	_nh.getParam("/op_common_params/horizontalSafetyDistance", m_PlanningParams.horizontalSafetyDistancel);
+	_nh.getParam("/op_common_params/horizontalSafetyDistance", m_PlanningParams.horizontalSafetyDistancel);	//侧向安全距离, 和车的宽度共同作用
 	_nh.getParam("/op_common_params/verticalSafetyDistance", m_PlanningParams.verticalSafetyDistance);
 	_nh.getParam("/op_common_params/enableSwerving", m_PlanningParams.enableSwerving);
 	if(m_PlanningParams.enableSwerving)
@@ -151,7 +151,7 @@ void TrajectoryEval::callbackGetRobotOdom(const nav_msgs::OdometryConstPtr& msg)
 	bVehicleStatus = true;
 }
 
-void TrajectoryEval::callbackGetGlobalPlannerPath(const autoware_msgs::LaneArrayConstPtr& msg)
+void TrajectoryEval::callbackGetGlobalPlannerPath(const autoware_msgs::LaneArrayConstPtr& msg)	// 全局路径op_global_planner给出
 {
 	if(msg->lanes.size() > 0)
 	{
@@ -169,23 +169,23 @@ void TrajectoryEval::callbackGetGlobalPlannerPath(const autoware_msgs::LaneArray
 
 			if(bOldGlobalPath)
 			{
-				bOldGlobalPath = PlannerHNS::PlanningHelpers::CompareTrajectories(m_temp_path, m_GlobalPaths.at(i));
+				bOldGlobalPath = PlannerHNS::PlanningHelpers::CompareTrajectories(m_temp_path, m_GlobalPaths.at(i));	// 比较两条轨迹各个wp的v,x,y,alt,lon是否全部相同
 			}
 		}
 
-		if(!bOldGlobalPath)
+		if(!bOldGlobalPath)	// 如果是新的轨迹
 		{
 			bWayGlobalPath = true;
 			std::cout << "Received New Global Path Evaluator! " << std::endl;
 		}
 		else
 		{
-			m_GlobalPaths.clear();
+			m_GlobalPaths.clear();	// 如果是旧的轨迹, 清空m_GlobalPaths
 		}
 	}
 }
 
-void TrajectoryEval::callbackGetLocalPlannerPath(const autoware_msgs::LaneArrayConstPtr& msg)
+void TrajectoryEval::callbackGetLocalPlannerPath(const autoware_msgs::LaneArrayConstPtr& msg)	// op_trajectories_generator给出
 {
 	if(msg->lanes.size() > 0)
 	{
@@ -198,7 +198,7 @@ void TrajectoryEval::callbackGetLocalPlannerPath(const autoware_msgs::LaneArrayC
 			PlannerHNS::ROSHelpers::ConvertFromAutowareLaneToLocalLane(msg->lanes.at(i), path);
 			m_GeneratedRollOuts.push_back(path);
 			if(path.size() > 0)
-				globalPathId_roll_outs = path.at(0).gid;
+				globalPathId_roll_outs = path.at(0).gid;		// 全局路径id
 		}
 
 		if(bWayGlobalPath && m_GlobalPaths.size() > 0 && m_GlobalPaths.at(0).size() > 0)
@@ -206,7 +206,7 @@ void TrajectoryEval::callbackGetLocalPlannerPath(const autoware_msgs::LaneArrayC
 			int globalPathId = m_GlobalPaths.at(0).at(0).gid;
 			std::cout << "Before Synchronization At Trajectory Evaluator: GlobalID: " <<  globalPathId << ", LocalID: " << globalPathId_roll_outs << std::endl;
 
-			if(globalPathId_roll_outs == globalPathId)
+			if(globalPathId_roll_outs == globalPathId)		// 比较局部规划的路径和全局路径的全局路径id, 确定两者是同步的
 			{
 				bWayGlobalPath = false;
 				m_GlobalPathsToUse = m_GlobalPaths;
@@ -254,13 +254,13 @@ void TrajectoryEval::MainLoop()
 		ros::spinOnce();
 		PlannerHNS::TrajectoryCost tc;
 
-		if(bNewCurrentPos && m_GlobalPaths.size()>0)
+		if(bNewCurrentPos && m_GlobalPaths.size()>0)		// 只有两者同时满足, 才不会频繁订阅lane_waypoints_array, 也就不会不断保存/清除m_GlobalPaths
 		{
 			m_GlobalPathSections.clear();
 
-			for(unsigned int i = 0; i < m_GlobalPathsToUse.size(); i++)
+			for(unsigned int i = 0; i < m_GlobalPathsToUse.size(); i++)		// 每条全局路径都生成一条局部路径
 			{
-				t_centerTrajectorySmoothed.clear();
+				t_centerTrajectorySmoothed.clear();	// 根据全局路径, 当前位姿, 规划距离,以及航点密集参数生成局部规划的平滑路径
 				PlannerHNS::PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(m_GlobalPathsToUse.at(i), m_CurrentPos, m_PlanningParams.horizonDistance , m_PlanningParams.pathDensity ,t_centerTrajectorySmoothed);
 				m_GlobalPathSections.push_back(t_centerTrajectorySmoothed);
 			}
@@ -278,7 +278,7 @@ void TrajectoryEval::MainLoop()
 				l.cost = tc.cost;
 				l.is_blocked = tc.bBlocked;
 				l.lane_index = tc.index;
-				pub_TrajectoryCost.publish(l);
+				pub_TrajectoryCost.publish(l);	// 发布车道路径信息
 			}
 
 			if(m_TrajectoryCostsCalculator.m_TrajectoryCosts.size() == m_GeneratedRollOuts.size())
@@ -319,7 +319,7 @@ void TrajectoryEval::MainLoop()
 			}
 		}
 		else
-			sub_GlobalPlannerPaths = nh.subscribe("/lane_waypoints_array", 	1,		&TrajectoryEval::callbackGetGlobalPlannerPath, 	this);
+			sub_GlobalPlannerPaths = nh.subscribe("/lane_waypoints_array", 	1,		&TrajectoryEval::callbackGetGlobalPlannerPath, 	this);	// 因为该话题的发布者带了-l选项, 所以一订阅就能收到最新的一个数据
 
 		loop_rate.sleep();
 	}
