@@ -418,7 +418,7 @@ double PlanningHelpers::GetExactDistanceOnTrajectory(const std::vector<WayPoint>
 {
 	if(trajectory.size() == 0) return 0;
 
-	if(p2.iFront == p1.iFront && p2.iBack == p1.iBack)	//如果两个RelativeInfo的front和back相同, 直接如下相减,    但是感觉应该加个负号!!!!
+	if(p2.iFront == p1.iFront && p2.iBack == p1.iBack)	//如果两个RelativeInfo的front和back相同, 直接如下相减
 	{
 		return p2.to_front_distance - p1.to_front_distance;
 	}

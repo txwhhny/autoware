@@ -86,7 +86,7 @@ void TrajectoryGen::UpdatePlanningParams(ros::NodeHandle& _nh)
 
 	_nh.getParam("/op_common_params/maxVelocity", m_PlanningParams.maxSpeed);		// 未使用
 	_nh.getParam("/op_common_params/minVelocity", m_PlanningParams.minSpeed);		// 未使用
-	_nh.getParam("/op_common_params/maxLocalPlanDistance", m_PlanningParams.microPlanDistance);		// rollout部分的距离, 也就是规划出来的候选轨迹到了平行区域之后的距离
+	_nh.getParam("/op_common_params/maxLocalPlanDistance", m_PlanningParams.microPlanDistance);		//cartip->rollin->rollout,是rollout部分的距离, 也就是规划出来的候选轨迹到了平行区域之后的距离
 
 	_nh.getParam("/op_common_params/pathDensity", m_PlanningParams.pathDensity);						// tracjectory轨迹点的密集程度,也就是点的间距,处理成均匀的
 	_nh.getParam("/op_common_params/rollOutDensity", m_PlanningParams.rollOutDensity);			// rollout部分的间距, 也就是候选轨迹平行线之间的间距

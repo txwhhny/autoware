@@ -126,34 +126,34 @@ TrajectoryCost TrajectoryDynamicCosts::DoOneStepStatic(const vector<vector<WayPo
 	bestTrajectory.index = -1;
 
 	RelativeInfo obj_info;
-	PlanningHelpers::GetRelativeInfo(totalPaths, currState, obj_info);
-	int currIndex = params.rollOutNumber/2 + floor(obj_info.perp_distance/params.rollOutDensity);
+	PlanningHelpers::GetRelativeInfo(totalPaths, currState, obj_info);		// 根据currState,获取和全局路径的RelativeInfo
+	int currIndex = params.rollOutNumber/2 + floor(obj_info.perp_distance/params.rollOutDensity);	// 根据info中的perp_distance, 计算接近的rollout的索引
 	//std::cout <<  "Current Index: " << currIndex << std::endl;
 	if(currIndex < 0)
 		currIndex = 0;
 	else if(currIndex > params.rollOutNumber)
 		currIndex = params.rollOutNumber;
 
-	m_TrajectoryCosts.clear();
+	m_TrajectoryCosts.clear();		// 各候选局部路径的cost信息
 	if(rollOuts.size()>0)
 	{
 		TrajectoryCost tc;
-		int centralIndex = params.rollOutNumber/2;
+		int centralIndex = params.rollOutNumber/2;	// 中线索引
 		tc.lane_index = 0;
 		for(unsigned int it=0; it< rollOuts.size(); it++)
 		{
 			tc.index = it;
 			tc.relative_index = it - centralIndex;
-			tc.distance_from_center = params.rollOutDensity*tc.relative_index;
+			tc.distance_from_center = params.rollOutDensity*tc.relative_index;	// 与中线的间距
 			tc.priority_cost = fabs(tc.distance_from_center);
-			tc.closest_obj_distance = params.horizonDistance;
+			tc.closest_obj_distance = params.horizonDistance;	// 初始化closest_obj_distance为局部路径规划的最大距离
 			if(rollOuts.at(it).size() > 0)
 					tc.lane_change_cost = rollOuts.at(it).at(0).laneChangeCost;
 			m_TrajectoryCosts.push_back(tc);
 		}
 	}
 
-	CalculateTransitionCosts(m_TrajectoryCosts, currIndex, params);
+	CalculateTransitionCosts(m_TrajectoryCosts, currIndex, params);		// 计算从当前index(候选路径中的1个)过渡到所有候选路径(包括自己)的代价
 
 	WayPoint p;
 	m_AllContourPoints.clear();
@@ -164,7 +164,7 @@ TrajectoryCost TrajectoryDynamicCosts::DoOneStepStatic(const vector<vector<WayPo
 			p.pos = obj_list.at(io).contour.at(icon);
 			p.v = obj_list.at(io).center.v;
 			p.id = io;
-			p.cost = sqrt(obj_list.at(io).w*obj_list.at(io).w + obj_list.at(io).l*obj_list.at(io).l);
+			p.cost = sqrt(obj_list.at(io).w*obj_list.at(io).w + obj_list.at(io).l*obj_list.at(io).l);		// obj的宽和长, 也就是求对角线?
 			m_AllContourPoints.push_back(p);
 		}
 	}
@@ -322,12 +322,12 @@ void TrajectoryDynamicCosts::CalculateLateralAndLongitudinalCostsStatic(vector<T
 	double critical_long_front_distance =  carInfo.wheel_base/2.0 + carInfo.length/2.0 + params.verticalSafetyDistance;
 	double critical_long_back_distance =  carInfo.length/2.0 + params.verticalSafetyDistance - carInfo.wheel_base/2.0;
 
-	PlannerHNS::Mat3 invRotationMat(currState.pos.a-M_PI_2);
+	PlannerHNS::Mat3 invRotationMat(currState.pos.a-M_PI_2);			// 换成普通的直角坐标系
 	PlannerHNS::Mat3 invTranslationMat(currState.pos.x, currState.pos.y);
 
 	double corner_slide_distance = critical_lateral_distance/2.0;
-	double ratio_to_angle = corner_slide_distance/carInfo.max_steer_angle;
-	double slide_distance = vehicleState.steer * ratio_to_angle;
+	double ratio_to_angle = corner_slide_distance/carInfo.max_steer_angle;	// 单位转向角度对应的侧向安全距离
+	double slide_distance = vehicleState.steer * ratio_to_angle;						// 实际转向角度对应的侧向距离
 
 	GPSPoint bottom_left(-critical_lateral_distance ,-critical_long_back_distance,  currState.pos.z, 0);
 	GPSPoint bottom_right(critical_lateral_distance, -critical_long_back_distance,  currState.pos.z, 0);
@@ -338,7 +338,7 @@ void TrajectoryDynamicCosts::CalculateLateralAndLongitudinalCostsStatic(vector<T
 	GPSPoint top_right(critical_lateral_distance - slide_distance, critical_long_front_distance,  currState.pos.z, 0);
 	GPSPoint top_left(-critical_lateral_distance - slide_distance , critical_long_front_distance, currState.pos.z, 0);
 
-	bottom_left = invRotationMat*bottom_left;
+	bottom_left = invRotationMat*bottom_left;			// 6个顶点的直角坐标系坐标转换回currState所在坐标系的表示
 	bottom_left = invTranslationMat*bottom_left;
 
 	top_right = invRotationMat*top_right;
@@ -356,7 +356,7 @@ void TrajectoryDynamicCosts::CalculateLateralAndLongitudinalCostsStatic(vector<T
 	top_left_car = invRotationMat*top_left_car;
 	top_left_car = invTranslationMat*top_left_car;
 
-	m_SafetyBorder.points.clear();
+	m_SafetyBorder.points.clear();							// 保存safeborder的6个顶点
 	m_SafetyBorder.points.push_back(bottom_left) ;
 	m_SafetyBorder.points.push_back(bottom_right) ;
 	m_SafetyBorder.points.push_back(top_right_car) ;
@@ -374,17 +374,17 @@ void TrajectoryDynamicCosts::CalculateLateralAndLongitudinalCostsStatic(vector<T
 		for(unsigned int it=0; it< rollOuts.size(); it++)
 		{
 			int skip_id = -1;
-			for(unsigned int icon = 0; icon < contourPoints.size(); icon++)
+			for(unsigned int icon = 0; icon < contourPoints.size(); icon++)		// objlist中所有obj的所有顶点
 			{
-				if(skip_id == contourPoints.at(icon).id)
+				if(skip_id == contourPoints.at(icon).id)		// id是在list中的索引, 相当于obj的索引
 					continue;
 
 				RelativeInfo obj_info;
-				PlanningHelpers::GetRelativeInfo(totalPaths, contourPoints.at(icon), obj_info);
-				double longitudinalDist = PlanningHelpers::GetExactDistanceOnTrajectory(totalPaths, car_info, obj_info);
+				PlanningHelpers::GetRelativeInfo(totalPaths, contourPoints.at(icon), obj_info);		// obj顶点和全局路径的位置关系
+				double longitudinalDist = PlanningHelpers::GetExactDistanceOnTrajectory(totalPaths, car_info, obj_info);	// 计算car和obj的沿路径方向的距离
 				if(obj_info.iFront == 0 && longitudinalDist > 0)
 					longitudinalDist = -longitudinalDist;
-
+				// obj的轮廓点到路径的"垂直"距离
 				double direct_distance = hypot(obj_info.perp_point.pos.y-contourPoints.at(icon).pos.y, obj_info.perp_point.pos.x-contourPoints.at(icon).pos.x);
 				if(contourPoints.at(icon).v < params.minSpeed && direct_distance > (m_LateralSkipDistance+contourPoints.at(icon).cost))
 				{
@@ -402,19 +402,19 @@ void TrajectoryDynamicCosts::CalculateLateralAndLongitudinalCostsStatic(vector<T
 				if(close_in_percentage < 1)
 					distance_from_center = distance_from_center - distance_from_center * (1.0-close_in_percentage);
 
-				double lateralDist = fabs(obj_info.perp_distance - distance_from_center);
-
+				double lateralDist = fabs(obj_info.perp_distance - distance_from_center);	// obj到iCostIndex路径的距离
+				// obj在车后 || car到obj的距离足够远 || obj到当前候选路径的距离足够远, 则这些点都不会造成碰撞, 直接跳过
 				if(longitudinalDist < -carInfo.length || longitudinalDist > params.minFollowingDistance || lateralDist > m_LateralSkipDistance)
 				{
 					continue;
 				}
 
-				longitudinalDist = longitudinalDist - critical_long_front_distance;
+				longitudinalDist = longitudinalDist - critical_long_front_distance;		// car与obj沿路径方向的距离减去安全距离, 则为可用过渡距离
 
-				if(m_SafetyBorder.PointInsidePolygon(m_SafetyBorder, contourPoints.at(icon).pos) == true)
+				if(m_SafetyBorder.PointInsidePolygon(m_SafetyBorder, contourPoints.at(icon).pos) == true)		// obj的点在安全边界内, block
 					trajectoryCosts.at(iCostIndex).bBlocked = true;
 
-				if(lateralDist <= critical_lateral_distance
+				if(lateralDist <= critical_lateral_distance				// 侧向距离小于安全距离 && 与obj的距离处于安全距离范围内, block
 						&& longitudinalDist >= -carInfo.length/1.5
 						&& longitudinalDist < params.minFollowingDistance)
 					trajectoryCosts.at(iCostIndex).bBlocked = true;
@@ -426,7 +426,7 @@ void TrajectoryDynamicCosts::CalculateLateralAndLongitudinalCostsStatic(vector<T
 				if(longitudinalDist != 0)
 					trajectoryCosts.at(iCostIndex).longitudinal_cost += 1.0/fabs(longitudinalDist);
 
-
+				// 到了这里, 虽然不会碰撞,但是距离obj很近
 				if(longitudinalDist >= -critical_long_front_distance && longitudinalDist < trajectoryCosts.at(iCostIndex).closest_obj_distance)
 				{
 					trajectoryCosts.at(iCostIndex).closest_obj_distance = longitudinalDist;

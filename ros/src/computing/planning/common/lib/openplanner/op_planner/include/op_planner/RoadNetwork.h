@@ -875,36 +875,36 @@ public:
 	double 	maxSpeed;
 	double 	minSpeed;
 	double 	planningDistance;
-	double 	microPlanDistance;
-	double 	carTipMargin;
-	double 	rollInMargin;
-	double 	rollInSpeedFactor;
-	double 	pathDensity;
-	double 	rollOutDensity;
-	int 	rollOutNumber;
-	double 	horizonDistance;
+	double 	microPlanDistance;				//cartip->rollin->rollout,是rollout部分的距离, 也就是规划出来的候选轨迹到了平行区域之后的距离
+	double 	carTipMargin;				    	// 从车辆中心点到水平采样的起点，这部分的长度决定了车辆切换不同轨迹的平滑程度
+	double 	rollInMargin;							// 从水平采样的起点到平行采样的起点，这部分的长度和车辆速度密切相关，车辆速度越快，rollin部分应越长，使得轨迹更加平滑。
+	double 	rollInSpeedFactor;				// 速度因子, 该值*当前车速(如ndt_matching给出的速度)+m_PlanningParams.rollInMargin作为真实的rollin进行计算
+	double 	pathDensity;							// tracjectory轨迹点的密集程度,也就是点的间距,处理成均匀的
+	double 	rollOutDensity;						// rollout部分的间距, 也就是候选轨迹平行线之间的间距
+	int 	rollOutNumber;							// 规划的路径数量是该值+1(包括了原有的一条)
+	double 	horizonDistance;					// 局部路径最大距离
 	double 	minFollowingDistance; //should be bigger than Distance to follow
 	double 	minDistanceToAvoid; // should be smaller than minFollowingDistance and larger than maxDistanceToAvoid
 	double	maxDistanceToAvoid; // should be smaller than minDistanceToAvoid
 	double 	speedProfileFactor;
-	double 	smoothingDataWeight;
-	double 	smoothingSmoothWeight;
+	double 	smoothingDataWeight;			// 平滑处理是迭代多次的, 相当于一个因子, factor*(处理前-处理后)
+	double 	smoothingSmoothWeight;		// 平滑处理中, 相当于一个因子, factor*((前一点+后一点))-2当前点)
 	double 	smoothingToleranceError;
 
 	double stopSignStopTime;
 
 	double additionalBrakingDistance;
-	double verticalSafetyDistance;
-	double horizontalSafetyDistancel;
+	double verticalSafetyDistance;		// 纵向安全距离基准,分为前方和后方两种计算方式,前方:wheel_base/2.0 + length/2.0 + verticalSafetyDistance, 后方length/2.0 + verticalSafetyDistance-wheel_base/2.0
+	double horizontalSafetyDistancel;	// 水平安全距离基准,加上车身宽度/2作为侧向安全距离
 
 	double giveUpDistance;
 
 	int nReliableCount;
 
 	bool 	enableLaneChange;
-	bool 	enableSwerving;
+	bool 	enableSwerving;								// 是否可以急转弯, 应该为true, 故意"基本未使用"
 	bool 	enableFollowing;
-	bool 	enableHeadingSmoothing;
+	bool 	enableHeadingSmoothing;				// 暂未使用,那部分代码被注释掉了
 	bool 	enableTrafficLightBehavior;
 	bool 	enableStopSignBehavior;
 
