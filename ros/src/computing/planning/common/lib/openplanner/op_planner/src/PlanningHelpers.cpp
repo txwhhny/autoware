@@ -246,6 +246,8 @@ bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajec
 			{
 				info.bAfter = true;
 			}
+			
+			info.iFront = trajectory.size() - 1;
 		}
 	}
 	else
