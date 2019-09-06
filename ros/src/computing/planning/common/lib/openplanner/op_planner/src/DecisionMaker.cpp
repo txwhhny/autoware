@@ -154,9 +154,9 @@ void DecisionMaker::InitBehaviorStates()
  	PreCalculatedConditions* pValues = m_pCurrentBehaviorState->GetCalcParams();
 
  	if(m_CarInfo.max_deceleration != 0)
- 		pValues->minStoppingDistance = -pow(car_state.speed, 2)/(m_CarInfo.max_deceleration);
+ 		pValues->minStoppingDistance = -pow(car_state.speed, 2)/(m_CarInfo.max_deceleration);		// 减速距离
 
- 	pValues->iCentralTrajectory		= m_pCurrentBehaviorState->m_pParams->rollOutNumber/2;
+ 	pValues->iCentralTrajectory		= m_pCurrentBehaviorState->m_pParams->rollOutNumber/2;			// 中心轨迹的编号
 
 	if(pValues->iPrevSafeTrajectory < 0)
 		pValues->iPrevSafeTrajectory = pValues->iCentralTrajectory;
@@ -167,10 +167,10 @@ void DecisionMaker::InitBehaviorStates()
  	pValues->currentTrafficLightID 	= -1;
  	pValues->bFullyBlock 			= false;
 
- 	pValues->distanceToNext = bestTrajectory.closest_obj_distance;
- 	pValues->velocityOfNext = bestTrajectory.closest_obj_velocity;
+ 	pValues->distanceToNext = bestTrajectory.closest_obj_distance;		// 接近obj的距离?
+ 	pValues->velocityOfNext = bestTrajectory.closest_obj_velocity;		// 接近obj时使用的速度?
 
- 	if(bestTrajectory.index >=0 &&  bestTrajectory.index < (int)m_RollOuts.size())
+ 	if(bestTrajectory.index >=0 &&  bestTrajectory.index < (int)m_RollOuts.size())		// 得到最优的路径索引, 如不合法,就使用中心线的路径
  		pValues->iCurrSafeTrajectory = bestTrajectory.index;
  	else
  		pValues->iCurrSafeTrajectory = pValues->iCentralTrajectory;
@@ -178,7 +178,7 @@ void DecisionMaker::InitBehaviorStates()
 	pValues->bFullyBlock = bestTrajectory.bBlocked;
 
  	if(bestTrajectory.lane_index >=0)
- 		pValues->iCurrSafeLane = bestTrajectory.lane_index;
+ 		pValues->iCurrSafeLane = bestTrajectory.lane_index;		// 当前安全车道
  	else
  	{
  		PlannerHNS::RelativeInfo info;

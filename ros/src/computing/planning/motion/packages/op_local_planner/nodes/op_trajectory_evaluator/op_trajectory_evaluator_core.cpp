@@ -240,7 +240,7 @@ void TrajectoryEval::callbackGetPredictedObjects(const autoware_msgs::DetectedOb
 
 void TrajectoryEval::callbackGetBehaviorState(const geometry_msgs::TwistStampedConstPtr& msg)
 {
-	m_CurrentBehavior.iTrajectory = msg->twist.angular.z;
+	m_CurrentBehavior.iTrajectory = msg->twist.angular.z;		// 其实这里并不是传递角度, 而是候选路径的索引
 }
 
 void TrajectoryEval::MainLoop()

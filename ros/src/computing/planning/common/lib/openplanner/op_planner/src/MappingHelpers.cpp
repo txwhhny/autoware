@@ -928,7 +928,7 @@ WayPoint* MappingHelpers::GetClosestWaypointFromMap(const WayPoint& pos, RoadNet
 
 vector<WayPoint*> MappingHelpers::GetClosestWaypointsListFromMap(const WayPoint& pos, RoadNetwork& map, const double& distance, const bool bDirectionBased)
 {
-	vector<Lane*> pLanes = GetClosestLanesListFromMap(pos, map, distance, bDirectionBased);
+	vector<Lane*> pLanes = GetClosestLanesListFromMap(pos, map, distance, bDirectionBased);	// 从map中,为每个roadSegment都找出一个最接近pos的lane
 
 	vector<WayPoint*> waypoints_list;
 
@@ -978,7 +978,7 @@ std::vector<Lane*> MappingHelpers::GetClosestLanesFast(const WayPoint& center, R
 		for(unsigned int k=0; k< map.roadSegments.at(j).Lanes.size(); k ++)
 		{
 			Lane* pL = &map.roadSegments.at(j).Lanes.at(k);
-			int index = PlanningHelpers::GetClosestNextPointIndexFast(pL->points, center);
+			int index = PlanningHelpers::GetClosestNextPointIndexFast(pL->points, center);			// 为每条lane找到最接近center前方的点的索引
 
 			if(index < 0 || index >= pL->points.size()) continue;
 
@@ -988,7 +988,7 @@ std::vector<Lane*> MappingHelpers::GetClosestLanesFast(const WayPoint& center, R
 		}
 	}
 
-	return lanesList;
+	return lanesList;	// 返回满足距离小于distance的所有lane的指针
 }
 
 Lane* MappingHelpers::GetClosestLaneFromMap(const WayPoint& pos, RoadNetwork& map, const double& distance, const bool bDirectionBased)
@@ -1042,13 +1042,13 @@ Lane* MappingHelpers::GetClosestLaneFromMap(const WayPoint& pos, RoadNetwork& ma
 
 	return closest_lane;
 }
-
+// pos-"当前位置", distance-查找范围, 就是当前位置到lane"最近点"的距离上限, bDirectionBase-"最近点.a"与pos.a的夹角需小于30度
 vector<Lane*> MappingHelpers::GetClosestLanesListFromMap(const WayPoint& pos, RoadNetwork& map, const double& distance, const bool bDirectionBased)
 {
 	vector<pair<double, Lane*> > laneLinksList;
 	double d = 0;
 	double min_d = DBL_MAX;
-	for(unsigned int j=0; j< map.roadSegments.size(); j ++)
+	for(unsigned int j=0; j< map.roadSegments.size(); j ++)		// 遍历每个roadSegments, 分别找出一条与pos最接近的lane
 	{
 		for(unsigned int k=0; k< map.roadSegments.at(j).Lanes.size(); k ++)
 		{

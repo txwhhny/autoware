@@ -60,15 +60,15 @@ public:
 
 	bool UpdateQuarterView(const PlannerHNS::WayPoint& v)
 	{
-		if(v.pos.a <= min_ang || v.pos.a > max_ang)
+		if(v.pos.a <= min_ang || v.pos.a > max_ang)		// v的朝向不属于当前的QuarterView范围内
 			return false;
 
-		if(bFirst)
+		if(bFirst)																	 // 强制更新
 		{
 			max_from_center = v;
 			bFirst = false;
 		}
-		else if(v.cost > max_from_center.cost)
+		else if(v.cost > max_from_center.cost)			// 保存的wp(max_from_center)的cost是否比v.cost小, 是的话就更新
 			max_from_center = v;
 
 		return true;

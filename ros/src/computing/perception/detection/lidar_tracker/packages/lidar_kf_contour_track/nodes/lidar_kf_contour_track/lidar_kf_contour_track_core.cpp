@@ -152,7 +152,7 @@ void ContourTracker::callbackGetCloudClusters(const autoware_msgs::CloudClusterA
 {
 	if(bNewCurrentPos || m_Params.bEnableSimulation)
 	{
-		ImportCloudClusters(msg, m_OriginalClusters);
+		ImportCloudClusters(msg, m_OriginalClusters);		// 根据msg, 得到各个obj的轮廓点云
 
 		struct timespec  tracking_timer;
 		UtilityHNS::UtilityH::GetTickCount(tracking_timer);
@@ -174,7 +174,7 @@ void ContourTracker::callbackGetCloudClusters(const autoware_msgs::CloudClusterA
 		}
 	}
 }
-
+// 根据objs的原始点云, 计算每个obj的近似的轮廓
 void ContourTracker::ImportCloudClusters(const autoware_msgs::CloudClusterArrayConstPtr& msg, std::vector<PlannerHNS::DetectedObject>& originalClusters)
 {
 	originalClusters.clear();
@@ -229,9 +229,9 @@ void ContourTracker::ImportCloudClusters(const autoware_msgs::CloudClusterArrayC
 
 		UtilityHNS::UtilityH::GetTickCount(poly_est_time);
 		point_cloud.clear();
-		pcl::fromROSMsg(msg->clusters.at(i).cloud, point_cloud);
+		pcl::fromROSMsg(msg->clusters.at(i).cloud, point_cloud);		// 转换当前obj的点云
 
-		obj.contour = polyGen.EstimateClusterPolygon(point_cloud ,obj.center.pos,avg_center, m_Params.PolygonRes);
+		obj.contour = polyGen.EstimateClusterPolygon(point_cloud ,obj.center.pos,avg_center, m_Params.PolygonRes);	// avg_center当前obj新的质心位置
 
 		m_PolyEstimationTime += UtilityHNS::UtilityH::GetTimeDiffNow(poly_est_time);
 		m_nOriginalPoints += point_cloud.points.size();
@@ -256,14 +256,14 @@ bool ContourTracker::IsCar(const PlannerHNS::DetectedObject& obj, const PlannerH
 			PlannerHNS::PlanningHelpers::GetRelativeInfoLimited(m_ClosestLanesList.at(i)->points, obj.center, info);
 			PlannerHNS::WayPoint wp = m_ClosestLanesList.at(i)->points.at(info.iFront);
 
-			double direct_d = hypot(wp.pos.y - obj.center.pos.y, wp.pos.x - obj.center.pos.x);
+			double direct_d = hypot(wp.pos.y - obj.center.pos.y, wp.pos.x - obj.center.pos.x);	// obj和当前lane的最近点的距离
 
 		//	std::cout << "- Distance To Car: " << obj.distance_to_center << ", PerpD: " << info.perp_distance << ", DirectD: " << direct_d << ", bAfter: " << info.bAfter << ", bBefore: " << info.bBefore << std::endl;
 
-			if((info.bAfter || info.bBefore) && direct_d > m_MapFilterDistance*2.0)
+			if((info.bAfter || info.bBefore) && direct_d > m_MapFilterDistance*2.0)		// 如果点p在轨迹的前/后方, 并且距离大于两倍搜索范围, 则跳过
 				continue;
 
-			if(fabs(info.perp_distance) <= m_MapFilterDistance)
+			if(fabs(info.perp_distance) <= m_MapFilterDistance)		// 如果点p与轨迹的"垂直"距离小于m_MapFilterDistance
 			{
 				bOnLane = true;
 				break;
@@ -274,7 +274,7 @@ bool ContourTracker::IsCar(const PlannerHNS::DetectedObject& obj, const PlannerH
 			return false;
 	}
 
-	if(!m_Params.bEnableSimulation)
+	if(!m_Params.bEnableSimulation)		// 禁用仿真的情况下
 	{
 		double object_size = hypot(obj.w, obj.l);
 
@@ -284,19 +284,19 @@ bool ContourTracker::IsCar(const PlannerHNS::DetectedObject& obj, const PlannerH
 			return false;
 	}
 
-	if(m_Params.bEnableSimulation)
+	if(m_Params.bEnableSimulation)	// 启用仿真的情况下
 	{
 		PlannerHNS::Mat3 rotationMat(-currState.pos.a);
 		PlannerHNS::Mat3 translationMat(-currState.pos.x, -currState.pos.y);
 
-		PlannerHNS::GPSPoint relative_point = translationMat*obj.center.pos;
+		PlannerHNS::GPSPoint relative_point = translationMat*obj.center.pos;	// obj是全局坐标系下的点, 转换到以currentState为原点的坐标系下的点
 		relative_point = rotationMat*relative_point;
 
 		double distance_x = fabs(relative_point.x - m_Params.VehicleLength/3.0);
 		double distance_y = fabs(relative_point.y);
 
 		if(distance_x  <= m_Params.VehicleLength*0.5 && distance_y <=  m_Params.VehicleWidth*0.5) // don't detect yourself
-			return false;
+			return false;					// 这个有写反? 在这个范围内, 不就是车身的范围吗?
 	}
 
 	return true;
@@ -338,7 +338,7 @@ void ContourTracker::VisualizeLocalTracking()
 	for(unsigned int i = 0; i < m_ObstacleTracking.m_InterestRegions.size(); i++)
 	{
 		visualization_msgs::Marker circle_mkrs;
-		PlannerHNS::ROSHelpers::CreateCircleMarker(m_CurrentPos, m_ObstacleTracking.m_InterestRegions.at(i)->radius, i ,circle_mkrs );
+		PlannerHNS::ROSHelpers::CreateCircleMarker(m_CurrentPos, m_ObstacleTracking.m_InterestRegions.at(i)->radius, i ,circle_mkrs );	// 根据当前位置及遍历的各个半径画圆
 		all_circles.markers.push_back(circle_mkrs);
 	}
 

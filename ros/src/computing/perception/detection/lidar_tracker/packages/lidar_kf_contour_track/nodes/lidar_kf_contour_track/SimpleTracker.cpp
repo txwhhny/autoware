@@ -157,7 +157,7 @@ void SimpleTracker::MatchWithDistanceOnly()
 	{
 		double iClosest_track = -1;
 		double iClosest_obj = -1;
-		double dClosest = m_MAX_ASSOCIATION_DISTANCE;
+		double dClosest = m_MAX_ASSOCIATION_DISTANCE;		// 关联距离, 小于此距离, 则认为是同一个obj
 		double size_diff = 0;
 		//std::cout << std::endl;
 
@@ -183,13 +183,13 @@ void SimpleTracker::MatchWithDistanceOnly()
 			}
 		}
 
-		if(iClosest_obj != -1 && iClosest_track != -1 && dClosest < m_MAX_ASSOCIATION_DISTANCE)
+		if(iClosest_obj != -1 && iClosest_track != -1 && dClosest < m_MAX_ASSOCIATION_DISTANCE)		// 找到匹配的,obj关联到KFTrackV, 质心组队放到MatchList中,同时从俩来源处擦除.
 		{
 			std::cout << "MatchObj: " << m_TrackSimply.at(iClosest_track).obj.id << ", MinD: " << dClosest << ", SizeDiff: (" << size_diff <<  ")" << ", ObjI" << iClosest_obj <<", TrackI: " << iClosest_track << std::endl;
 			m_MatchList.push_back(std::make_pair(m_TrackSimply.at(iClosest_track).obj.center, m_DetectedObjects.at(iClosest_obj).center));
 			m_DetectedObjects.at(iClosest_obj).id = m_TrackSimply.at(iClosest_track).obj.id;
 			MergeObjectAndTrack(m_TrackSimply.at(iClosest_track), m_DetectedObjects.at(iClosest_obj));
-			newObjects.push_back(m_TrackSimply.at(iClosest_track));
+			newObjects.push_back(m_TrackSimply.at(iClosest_track));			// 原有的tracker放到newObjects
 			m_TrackSimply.erase(m_TrackSimply.begin()+iClosest_track);
 			m_DetectedObjects.erase(m_DetectedObjects.begin()+iClosest_obj);
 		}
@@ -476,7 +476,7 @@ void SimpleTracker::MatchClosestCost()
 
 void SimpleTracker::AssociateOnly()
 {
-	MatchWithDistanceOnly();
+	MatchWithDistanceOnly();		// 根据距离关联m_DetectedObjects和m_TrackSimply的obj,更新到m_TrackSimply
 
 	for(unsigned int i =0; i< m_TrackSimply.size(); i++)
 		m_TrackSimply.at(i).UpdateAssociateOnly(m_dt, m_TrackSimply.at(i).obj, m_TrackSimply.at(i).obj);
@@ -491,14 +491,14 @@ void SimpleTracker::AssociateSimply()
 	for(unsigned int i = 0; i < m_TrackSimply.size(); i++)
 		m_TrackSimply.at(i).m_bUpdated = false;
 
-	MatchWithDistanceOnly();
+	MatchWithDistanceOnly();  // 根据距离关联m_DetectedObjects和m_TrackSimply的obj,更新到m_TrackSimply
 
 	for(unsigned int i =0; i< m_TrackSimply.size(); i++)
-		m_TrackSimply.at(i).UpdateTracking(m_dt, m_TrackSimply.at(i).obj, m_TrackSimply.at(i).obj);
+		m_TrackSimply.at(i).UpdateTracking(m_dt, m_TrackSimply.at(i).obj, m_TrackSimply.at(i).obj);		// 通过kf进行跟踪
 
 	m_DetectedObjects.clear();
 	for(unsigned int i = 0; i< m_TrackSimply.size(); i++)
-		m_DetectedObjects.push_back(m_TrackSimply.at(i).obj);
+		m_DetectedObjects.push_back(m_TrackSimply.at(i).obj);		// 结果放回m_DetectedObjects
 }
 
 void SimpleTracker::AssociateDistanceOnlyAndTrack()

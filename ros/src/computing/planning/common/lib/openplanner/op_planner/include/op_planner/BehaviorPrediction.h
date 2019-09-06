@@ -111,7 +111,7 @@ public:
 	BEH_STATE_TYPE best_beh;
 	double best_p;
 	std::vector<int> ids;
-	std::vector<int> path_ids;
+	std::vector<int> path_ids;		//
 	WayPoint path_last_pose;
 	double rms_error;
 	std::vector<WayPoint> trajectory;
@@ -231,14 +231,14 @@ public:
 		int curr_id = -10;
 		ids.clear();
 		path_ids.clear();
-		for(unsigned int i = 0; i < path.size(); i++)
+		for(unsigned int i = 0; i < path.size(); i++)		// 遍历path中的所有航点
 		{
 			curr_id = path.at(i).laneId;
-			path_ids.push_back(curr_id);
+			path_ids.push_back(curr_id);		// 各个航点的laneid保存下来
 
 			if(curr_id != prev_id)
 			{
-				ids.push_back(curr_id);
+				ids.push_back(curr_id);				// 去重的laneid
 				prev_id = curr_id;
 			}
 		}
@@ -304,7 +304,7 @@ public:
 			if(i < path_ids.size())
 			{
 				nCount++;
-				if(curr_id == path_ids.at(i))
+				if(curr_id == path_ids.at(i))			// 用于统计laneid"序列"的匹配率
 					nIds++;
 			}
 
@@ -329,15 +329,15 @@ public:
 		}
 
 		double rms_val = 0;
-		    for(unsigned int i=0; i < _path.size(); i++)
-		      {
+		for(unsigned int i=0; i < _path.size(); i++)
+		{
 			if(i < trajectory.size())
-			  {
-			    rms_val += hypot(_path.at(i).pos.y - trajectory.at(i).pos.y, _path.at(i).pos.y - trajectory.at(i).pos.y);
-			  }
-		      }
+		  {
+		    rms_val += hypot(_path.at(i).pos.y - trajectory.at(i).pos.y, _path.at(i).pos.y - trajectory.at(i).pos.y);
+		  }
+		}
 
-		    rms_error = rms_val;
+		rms_error = rms_val;
 
 		if(rms_error < 5.0)
 		  return 1;
@@ -346,19 +346,19 @@ public:
 			return 1;
 
 		WayPoint curr_last_pose = _path.at(_path.size()-1);
-		double nMatch = (double)nIds/(double)nCount;
+		double nMatch = (double)nIds/(double)nCount;			// laneid匹配率
 		double _d = hypot(path_last_pose.pos.y-curr_last_pose.pos.y, path_last_pose.pos.x-curr_last_pose.pos.x);
 
 		double dCost = _d/FIXED_PLANNING_DISTANCE;
 		if(dCost > 1.0)
 			dCost = 1.0;
-		double dMatch = 1.0 - dCost;
+		double dMatch = 1.0 - dCost;		// 终点距离匹配率
 
 		double _a_diff = UtilityHNS::UtilityH::AngleBetweenTwoAnglesPositive(path_last_pose.pos.a, curr_last_pose.pos.a);
 		double aCost = _a_diff/M_PI;
 		if(aCost > 1.0)
 			aCost = 1.0;
-		double aMatch = 1.0 - aCost;
+		double aMatch = 1.0 - aCost;		// 终点航向匹配率, M_PI表示反向了, 此时aMatch = 0; M_PI_2表示垂直了, 此时aMatch = 0.5
 
 		double totalMatch = (nMatch + dMatch + aMatch)/3.0;
 

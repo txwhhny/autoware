@@ -163,7 +163,7 @@ public:
 	void UpdateTracking(double _dt, const PlannerHNS::DetectedObject& oldObj, PlannerHNS::DetectedObject& predObj)
 	{
 
-
+		// 状态转移矩阵
 #if (CV_MAJOR_VERSION == 2)
 		m_filter.transitionMatrix = *(cv::Mat_<float>(nStates, nStates) << 1	,0	,_dt	,0  ,
 				0	,1	,0	,_dt	,
@@ -176,13 +176,13 @@ public:
 				0	,0	,0	,1	);
 #endif		
 
-		cv::Mat_<float> measurement(nMeasure,1);
-		cv::Mat_<float> prediction(nStates,1);
+		cv::Mat_<float> measurement(nMeasure,1);	// 观测: x, y
+		cv::Mat_<float> prediction(nStates,1);		// 状态空间: x, y, vx, vy
 
 		measurement(0) = oldObj.center.pos.x;
 		measurement(1) = oldObj.center.pos.y;
 
-		prediction = m_filter.correct(measurement);
+		prediction = m_filter.correct(measurement);		// 根据测量结果来更新预测的状态
 
 		predObj.center.pos.x = prediction.at<float>(0);
 		predObj.center.pos.y = prediction.at<float>(1);
@@ -195,7 +195,7 @@ public:
 
 		if(m_iLife > 1)
 		{
-			currV = sqrt(vx*vx+vy*vy);
+			currV = sqrt(vx*vx+vy*vy);			// 计算当前速度和偏航
 
 			double diff_y = predObj.center.pos.y - prev_y;
 			double diff_x = predObj.center.pos.x - prev_x;
@@ -216,7 +216,7 @@ public:
 			predObj.center.v = currV;
 			predObj.bVelocity = true;
 //			predObj.acceleration_raw = (currV - prev_v)/_dt;
-			if(time_diff > ACCELERATION_CALC_TIME)
+			if(time_diff > ACCELERATION_CALC_TIME)			// 加速度计算时机
 			{
 				currAccel = (currV - prev_big_v)/time_diff;
 				prev_big_v = currV;
@@ -229,9 +229,9 @@ public:
 			}
 
 			predObj.acceleration_raw = currAccel;
-			if(fabs(predObj.acceleration_raw) < ACCELERATION_DECISION_VALUE)
+			if(fabs(predObj.acceleration_raw) < ACCELERATION_DECISION_VALUE)		// raw在区间上, 则desc近似为0
 				predObj.acceleration_desc = 0;
-			else if(predObj.acceleration_raw > ACCELERATION_DECISION_VALUE)
+			else if(predObj.acceleration_raw > ACCELERATION_DECISION_VALUE)			// 两侧则分别为+1 和 -1
 				predObj.acceleration_desc = 1;
 			else if(predObj.acceleration_raw < -ACCELERATION_DECISION_VALUE)
 				predObj.acceleration_desc = -1;
@@ -262,7 +262,7 @@ public:
 		else
 			predObj.centers_list.push_back(predObj.center);
 
-		if(predObj.centers_list.size()>3)
+		if(predObj.centers_list.size()>3)			// predObj.center.pos的航向计算
 		{
 			predObj.bDirection = true;
 			predObj.center.pos.a = (predObj.centers_list.at(predObj.centers_list.size()-1).pos.a + predObj.centers_list.at(predObj.centers_list.size()-2).pos.a + predObj.centers_list.at(predObj.centers_list.size()-3).pos.a)/3.0;
@@ -277,7 +277,7 @@ public:
 		}
 
 
-		m_filter.predict();
+		m_filter.predict();		// 计算预测状态
 		m_filter.statePre.copyTo(m_filter.statePost);
 		m_filter.errorCovPre.copyTo(m_filter.errorCovPost);
 
@@ -310,7 +310,7 @@ public:
 		else
 			predObj.centers_list.push_back(predObj.center);
 
-		if(predObj.centers_list.size()>3)
+		if(predObj.centers_list.size()>3)		// center.pos.a, 大于3个点就取后3点的a的均值
 		{
 			predObj.center.pos.a = (predObj.centers_list.at(predObj.centers_list.size()-1).pos.a + predObj.centers_list.at(predObj.centers_list.size()-2).pos.a + predObj.centers_list.at(predObj.centers_list.size()-3).pos.a)/3.0;
 		}

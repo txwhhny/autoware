@@ -42,12 +42,12 @@ std::vector<PlannerHNS::GPSPoint> PolygonGenerator::EstimateClusterPolygon(const
 		p.pos.z = original_centroid.z;
 
 		PlannerHNS::GPSPoint v(p.pos.x - original_centroid.x , p.pos.y - original_centroid.y, 0, 0);
-		p.cost = pointNorm(v);
-		p.pos.a = UtilityHNS::UtilityH::FixNegativeAngle(atan2(v.y, v.x))*(180. / M_PI);
+		p.cost = pointNorm(v);		// 计算各个点与质心的距离
+		p.pos.a = UtilityHNS::UtilityH::FixNegativeAngle(atan2(v.y, v.x))*(180. / M_PI);	// 角度则决定了落在QuarterView的哪个扇区上
 
 		for(unsigned int j = 0 ; j < m_Quarters.size(); j++)
 		{
-			if(m_Quarters.at(j).UpdateQuarterView(p))
+			if(m_Quarters.at(j).UpdateQuarterView(p))				// cost大的,将被更新到QuarterView的相应扇区上
 				break;
 		}
 	}
@@ -56,13 +56,13 @@ std::vector<PlannerHNS::GPSPoint> PolygonGenerator::EstimateClusterPolygon(const
 	PlannerHNS::WayPoint wp;
 	for(unsigned int j = 0 ; j < m_Quarters.size(); j++)
 	{
-		if(m_Quarters.at(j).GetMaxPoint(wp))
+		if(m_Quarters.at(j).GetMaxPoint(wp))		// 获取m_Quarters各个扇区保存的cost最大的点, 准备用于构造polygon
 			m_Polygon.push_back(wp.pos);
 	}
 
 //	//Fix Resolution:
 	bool bChange = true;
-	while (bChange && m_Polygon.size()>1)
+	while (bChange && m_Polygon.size()>1)			// 计算"圆弧"上是否有存在两个点距离大于分辨率的,有就插入一个中间点
 	{
 		bChange = false;
 		PlannerHNS::GPSPoint p1 =  m_Polygon.at(m_Polygon.size()-1);
@@ -94,7 +94,7 @@ std::vector<PlannerHNS::GPSPoint> PolygonGenerator::EstimateClusterPolygon(const
 
 	if(m_Polygon.size() > 0)
 	{
-		new_centroid.x = sum_p.x / (double)m_Polygon.size();
+		new_centroid.x = sum_p.x / (double)m_Polygon.size();		// 计算新的质心位置
 		new_centroid.y = sum_p.y / (double)m_Polygon.size();
 	}
 
@@ -112,7 +112,7 @@ std::vector<QuarterView> PolygonGenerator::CreateQuarterViews(const int& nResolu
 	double angle = 0;
 	for(int i = 0; i < nResolution; i++)
 	{
-		QuarterView q(angle, angle+range, i);
+		QuarterView q(angle, angle+range, i);	// 最小角度, 最大角度, 索引
 		quarters.push_back(q);
 		angle+=range;
 	}

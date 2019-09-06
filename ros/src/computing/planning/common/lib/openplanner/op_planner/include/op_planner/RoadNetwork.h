@@ -474,7 +474,7 @@ public:
 	double angle_diff; // degrees	// 当前位姿与p1的夹角
 	bool bBefore;				// 表示p点在lane的起点之前(第2点到第一点延长线的前部,虽然不一定在延长线上)
 	bool bAfter;				// 表示p点在lane的终点之后(倒数第2点到终点的延长线之后,不一定在延长线上)
-	double after_angle;	
+	double after_angle;	// 用于判别bAfter的角度值,原则上只有0和PI, 为PI则表示perp_point和倒数第二个点分布于倒数第一个点的两侧, 也就是bAfter为true
 
 	RelativeInfo()
 	{
@@ -814,21 +814,21 @@ public:
 	int id;
 	std::string label;
 	OBSTACLE_TYPE t;
-	WayPoint center;
+	WayPoint center;			// 质心位置
 	WayPoint predicted_center;
 	WayPoint noisy_center;
 	STATE_TYPE predicted_behavior;
 	std::vector<WayPoint> centers_list;
 	std::vector<GPSPoint> contour;
 	std::vector<std::vector<WayPoint> > predTrajectories;
-	std::vector<WayPoint*> pClosestWaypoints;
+	std::vector<WayPoint*> pClosestWaypoints;		// 与center最接近(有距离上限)的所有roadsegment的所有lane中的wp(也就是"每个"lane都有一个最接近的wp)
 	double w;
-	double l;
+	double l;											// 长宽高
 	double h;
-	double distance_to_center;
+	double distance_to_center;		// 车的current_pose与质心的距离
 
 	double actual_speed;
-	double actual_yaw;
+	double actual_yaw;						// obj.estimated_angle, 就目前观察, 和center.pos.a是等值的
 
 	bool bDirection;
 	bool bVelocity;
@@ -1127,8 +1127,8 @@ public:
 class TrajectoryCost
 {
 public:
-	int index;
-	int relative_index;
+	int index;											// 在rollouts中的索引,"7选1"
+	int relative_index;							// 相对与中心线的索引-3~3
 	double closest_obj_velocity;		// 接近障碍物时的速度
 	double distance_from_center;		// 到中心线的距离,有正负
 	double priority_cost; //0 to 1
@@ -1137,7 +1137,7 @@ public:
 	double cost;
 	double closest_obj_distance;		// 最接近障碍物的距离, "垂直距离"
 
-	int lane_index;
+	int lane_index;									// 规划出7条局部路径的lane
 	double lane_change_cost;
 	double lateral_cost;
 	double longitudinal_cost;

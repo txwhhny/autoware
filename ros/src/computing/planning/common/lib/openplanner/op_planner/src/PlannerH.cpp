@@ -47,7 +47,7 @@ void PlannerH::GenerateRunoffTrajectory(const std::vector<std::vector<WayPoint> 
 
 	sampledPoints_debug.clear(); //for visualization only
 
-	for(unsigned int i = 0; i < referencePaths.size(); i++)		// 遍历局部路径集合
+	for(unsigned int i = 0; i < referencePaths.size(); i++)		// 遍历全局路径片段集合
 	{
 		std::vector<std::vector<WayPoint> > local_rollOutPaths;
 		int s_index = 0, e_index = 0;
@@ -348,14 +348,14 @@ double PlannerH::PredictTrajectoriesUsingDP(const WayPoint& startPose, std::vect
 	vector<WayPoint*> pLaneCells;
 	vector<int> unique_lanes;
 	std::vector<WayPoint> path;
-	for(unsigned int j = 0 ; j < closestWPs.size(); j++)
+	for(unsigned int j = 0 ; j < closestWPs.size(); j++)	// 每个closetwp分别处于map的各个roadsegment中,也就是各lane中最接近pos的点
 	{
-		pLaneCells.clear();
-		int nPaths =  PlanningHelpers::PredictiveIgnorIdsDP(closestWPs.at(j), maxPlanningDistance, all_cell_to_delete, pLaneCells, unique_lanes);
+		pLaneCells.clear();	
+		int nPaths =  PlanningHelpers::PredictiveIgnorIdsDP(closestWPs.at(j), maxPlanningDistance, all_cell_to_delete, pLaneCells, unique_lanes);	// 根据closestWPs找出与之相关的终点pLaneCells, pLaneCells数量可能大于closetWPs
 		for(unsigned int i = 0; i< pLaneCells.size(); i++)
 		{
 			path.clear();
-			PlanningHelpers::TraversePathTreeBackwards(pLaneCells.at(i), closestWPs.at(j), globalPath, path, tempCurrentForwardPathss);
+			PlanningHelpers::TraversePathTreeBackwards(pLaneCells.at(i), closestWPs.at(j), globalPath, path, tempCurrentForwardPathss);	// 根据终点回溯
 
 			for(unsigned int k = 0; k< path.size(); k++)
 			{
@@ -398,9 +398,9 @@ double PlannerH::PredictTrajectoriesUsingDP(const WayPoint& startPose, std::vect
 		else
 			p2 = p1 = startPose;
 
-		double branch_length = maxPlanningDistance*0.5;
+		double branch_length = maxPlanningDistance*0.5;			// maxPlanningDistance:减速距离
 
-		p2.pos.y = p1.pos.y + branch_length*0.4*sin(p1.pos.a);
+		p2.pos.y = p1.pos.y + branch_length*0.4*sin(p1.pos.a);	// p2, 沿着p1方向, 距离为branch_length*0.4的点就是p2
 		p2.pos.x = p1.pos.x + branch_length*0.4*cos(p1.pos.a);
 
 		vector<WayPoint> l_branch;

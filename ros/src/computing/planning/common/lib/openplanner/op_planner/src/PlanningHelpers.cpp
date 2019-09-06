@@ -159,7 +159,7 @@ bool PlanningHelpers::GetRelativeInfo(const std::vector<WayPoint>& trajectory, c
 }
 
 bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajectory, const WayPoint& p, RelativeInfo& info, const int& prevIndex )
-{
+{	// 附带判断了p的前方是轨迹的起点/中间/p点的后方是轨迹的终点
 	if(trajectory.size() < 2) return false;
 
 	WayPoint p0, p1;
@@ -169,14 +169,14 @@ bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajec
 		vector<WayPoint> _trajectory;
 		p0 = trajectory.at(0);
 		p1 = p0;
-		p1 = WayPoint((trajectory.at(0).pos.x+trajectory.at(1).pos.x)/2.0,
+		p1 = WayPoint((trajectory.at(0).pos.x+trajectory.at(1).pos.x)/2.0,	// 在p0和p1终点构造一个点,赋值给p1
 					  (trajectory.at(0).pos.y+trajectory.at(1).pos.y)/2.0,
 					  (trajectory.at(0).pos.z+trajectory.at(1).pos.z)/2.0, trajectory.at(0).pos.a);
 		_trajectory.push_back(p0);
 		_trajectory.push_back(p1);
-		_trajectory.push_back(trajectory.at(1));
+		_trajectory.push_back(trajectory.at(1));		// 这样临时变量_trajectory就有3个点
 
-		info.iFront = GetClosestNextPointIndexFast(_trajectory, p, prevIndex);
+		info.iFront = GetClosestNextPointIndexFast(_trajectory, p, prevIndex);	// 在轨迹上查找p点前方的点,且索引大于等于prevIndex
 		if(info.iFront > 0)
 			info.iBack = info.iFront -1;
 		else
@@ -246,7 +246,6 @@ bool PlanningHelpers::GetRelativeInfoLimited(const std::vector<WayPoint>& trajec
 			{
 				info.bAfter = true;
 			}
-
 		}
 	}
 	else
@@ -603,7 +602,7 @@ int PlanningHelpers::GetClosestNextPointIndexFastV2(const vector<WayPoint>& traj
 
 
 }
-// 在轨迹中查找最接近p的航点的索引
+// 在轨迹中查找最接近p的航点的索引, 该点是在p点的航向方向上的前方
 int PlanningHelpers::GetClosestNextPointIndexFast(const vector<WayPoint>& trajectory, const WayPoint& p,const int& prevIndex )
 {
 	int size = (int)trajectory.size();
@@ -1045,7 +1044,7 @@ void PlanningHelpers::CreateManualBranchFromTwoPoints(WayPoint& p1,WayPoint& p2 
 	{
 		branch_angle = p1.pos.a+M_PI_2;
 	}
-	endWP.pos.y = p2.pos.y + distance*sin(branch_angle);
+	endWP.pos.y = p2.pos.y + distance*sin(branch_angle);		// 沿着p1航向的侧向(根据方向上述方向决定角度)方向, 与p2距离为distance的点, 就是endWP
 	endWP.pos.x = p2.pos.x + distance*cos(branch_angle);
 
 	midWP = p2;
@@ -2218,7 +2217,7 @@ int PlanningHelpers::PredictiveIgnorIdsDP(WayPoint* pStart, const double& Distan
 		wp->pLeft = 0;
 		wp->pRight = 0;
 		nextLeafToTrace.push_back(make_pair(pZero, wp));
-		all_cells_to_delete.push_back(wp);
+		all_cells_to_delete.push_back(wp);			// wp是new出来的, 所以后面通过这个容器来释放空间
 
 		double 		distance 		= 0;
 		end_waypoints.clear();
@@ -2234,11 +2233,11 @@ int PlanningHelpers::PredictiveIgnorIdsDP(WayPoint* pStart, const double& Distan
 
 			nextLeafToTrace.erase(nextLeafToTrace.begin()+0);
 
-			for(unsigned int i =0; i< pH->pFronts.size(); i++)
+			for(unsigned int i =0; i< pH->pFronts.size(); i++)		// 遍历pH的所有front点
 			{
 				if(pH->pFronts.at(i) && !CheckNodeExits(all_cells_to_delete, pH->pFronts.at(i)))
 				{
-					if(pH->cost < DistanceLimit)
+					if(pH->cost < DistanceLimit)	// pH->cost 小于预测距离
 					{
 						wp = new WayPoint();
 						*wp = *pH->pFronts.at(i);

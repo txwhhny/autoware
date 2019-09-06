@@ -87,8 +87,8 @@ void PurePursuitNode::run()
       continue;
     }
 
-    pp_.setLookaheadDistance(computeLookaheadDistance());
-    pp_.setMinimumLookaheadDistance(minimum_lookahead_distance_);
+    pp_.setLookaheadDistance(computeLookaheadDistance());         // 设置预测距离
+    pp_.setMinimumLookaheadDistance(minimum_lookahead_distance_); // 设置最小预测距离
 
     double kappa = 0;
     bool can_get_curvature = pp_.canGetCurvature(&kappa);
@@ -140,10 +140,10 @@ void PurePursuitNode::publishControlCommandStamped(const bool &can_get_curvature
 
 double PurePursuitNode::computeLookaheadDistance() const
 {
-  if (param_flag_ == enumToInteger(Mode::dialog))
+  if (param_flag_ == enumToInteger(Mode::dialog))   // 如果是dialog模式, 就直接返回lookahead_distance
     return const_lookahead_distance_;
 
-  double maximum_lookahead_distance = current_linear_velocity_ * 10;
+  double maximum_lookahead_distance = current_linear_velocity_ * 10;  // 否则返回介于min和max闭区间的数值
   double ld = current_linear_velocity_ * lookahead_distance_ratio_;
 
   return ld < minimum_lookahead_distance_ ? minimum_lookahead_distance_ :
@@ -224,7 +224,7 @@ void PurePursuitNode::callbackFromCurrentVelocity(const geometry_msgs::TwistStam
 void PurePursuitNode::callbackFromWayPoints(const autoware_msgs::LaneConstPtr &msg)
 {
   if (!msg->waypoints.empty())
-    command_linear_velocity_ = msg->waypoints.at(0).twist.twist.linear.x;
+    command_linear_velocity_ = msg->waypoints.at(0).twist.twist.linear.x;   // 从航点中得到速度
   else
     command_linear_velocity_ = 0;
 

@@ -116,7 +116,7 @@ protected:
 	bool bMap;
 	double m_MapFilterDistance;
 
-	std::vector<PlannerHNS::Lane*> m_ClosestLanesList;
+	std::vector<PlannerHNS::Lane*> m_ClosestLanesList;			// 以当前pos为中心,满足指定半径内范围内的所有lane的指针
 
 	int m_nOriginalPoints;
 	int m_nContourPoints;

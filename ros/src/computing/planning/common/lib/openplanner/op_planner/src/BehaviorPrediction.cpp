@@ -83,7 +83,7 @@ void BehaviorPrediction::FilterObservations(const std::vector<DetectedObject>& o
 void BehaviorPrediction::DoOneStep(const std::vector<DetectedObject>& obj_list, const WayPoint& currPose, const double& minSpeed, const double& maxDeceleration, RoadNetwork& map)
 {
 	if(!m_bUseFixedPrediction && maxDeceleration !=0)
-		m_PredictionDistance = -pow(currPose.v, 2)/(maxDeceleration);
+		m_PredictionDistance = -pow(currPose.v, 2)/(maxDeceleration);		// 减速时的加速度maxDeceleration, v^2 - v_0^2 = 2as
 
 	ExtractTrajectoriesFromMap(obj_list, map, m_ParticleInfo_II);
 	CalculateCollisionTimes(minSpeed);
@@ -99,7 +99,7 @@ void BehaviorPrediction::CalculateCollisionTimes(const double& minSpeed)
 	for(unsigned int i=0; i < m_ParticleInfo_II.size(); i++)
 	{
 		for(unsigned int j=0; j < m_ParticleInfo_II.at(i)->obj.predTrajectories.size(); j++)
-		{
+		{	// 计算路径上各个航点的timecost
 			PlannerHNS::PlanningHelpers::PredictConstantTimeCostForTrajectory(m_ParticleInfo_II.at(i)->obj.predTrajectories.at(j), m_ParticleInfo_II.at(i)->obj.center, minSpeed, m_PredictionDistance);
 //			PlannerHNS::PlanningHelpers::CalcAngleAndCost(m_PredictedObjects.at(i).predTrajectories.at(j));
 		}
@@ -111,19 +111,19 @@ void BehaviorPrediction::ExtractTrajectoriesFromMap(const std::vector<DetectedOb
 	PlannerH planner;
 	m_temp_list_ii.clear();
 
-	std::vector<ObjParticles*> delete_me_list = old_obj_list;
+	std::vector<ObjParticles*> delete_me_list = old_obj_list;			// old_obj_list其实就是m_ParticleInfo_II
 
 	for(unsigned int i=0; i < curr_obj_list.size(); i++)
 	{
 		bool bMatch = false;
 		for(unsigned int ip=0; ip < old_obj_list.size(); ip++)
 		{
-			if(old_obj_list.at(ip)->obj.id == curr_obj_list.at(i).id)
+			if(old_obj_list.at(ip)->obj.id == curr_obj_list.at(i).id)		// 如果curr_obj的id在old_obj_list存在
 			{
 				bool bFound = false;
 				for(unsigned int k=0; k < m_temp_list_ii.size(); k++)
 				{
-					if(m_temp_list_ii.at(k) == old_obj_list.at(ip))
+					if(m_temp_list_ii.at(k) == old_obj_list.at(ip))					// 在m_temp_list_ii中也找到相应的obj
 					{
 						bFound = true;
 						break;
@@ -132,7 +132,7 @@ void BehaviorPrediction::ExtractTrajectoriesFromMap(const std::vector<DetectedOb
 
 				if(!bFound)
 				{
-					old_obj_list.at(ip)->obj = curr_obj_list.at(i);
+					old_obj_list.at(ip)->obj = curr_obj_list.at(i);					// 在tmp中不存在, 则修改old, 并push到tmp中
 					m_temp_list_ii.push_back(old_obj_list.at(ip));
 				}
 
@@ -144,7 +144,7 @@ void BehaviorPrediction::ExtractTrajectoriesFromMap(const std::vector<DetectedOb
 			}
 		}
 
-		if(!bMatch)
+		if(!bMatch)																										// old_obj_list中不存在curr_obj, 则新创建一个
 		{
 			ObjParticles* pNewObj = new  ObjParticles();
 			pNewObj->obj = curr_obj_list.at(i);
@@ -152,14 +152,14 @@ void BehaviorPrediction::ExtractTrajectoriesFromMap(const std::vector<DetectedOb
 		}
 	}
 
-	DeleteTheRest(delete_me_list);
+	DeleteTheRest(delete_me_list);			// 释放掉delete_me_list中的所有剩下的obj
 	old_obj_list.clear();
 	old_obj_list = m_temp_list_ii;
 
 	//m_PredictedObjects.clear();
 	for(unsigned int ip=0; ip < old_obj_list.size(); ip++)
 	{
-		PredictCurrentTrajectory(map, old_obj_list.at(ip));
+		PredictCurrentTrajectory(map, old_obj_list.at(ip));					// 这里obj获得了trajectories(map中每个roadsegment都有一条)
 		//m_PredictedObjects.push_back(old_obj_list.at(ip)->obj);
 		old_obj_list.at(ip)->MatchTrajectories();
 	}
@@ -174,13 +174,13 @@ void BehaviorPrediction::CalPredictionTimeForObject(ObjParticles* pCarPart)
 		pCarPart->m_PredictionTime = MIN_PREDICTION_TIME;
 }
 
-void BehaviorPrediction::PredictCurrentTrajectory(RoadNetwork& map, ObjParticles* pCarPart)
+void BehaviorPrediction::PredictCurrentTrajectory(RoadNetwork& map, ObjParticles* pCarPart)		// pCarPart包含了obj信息
 {
 	pCarPart->obj.predTrajectories.clear();
 	PlannerH planner;
-	if(pCarPart->obj.bDirection && pCarPart->obj.bVelocity)
+	if(pCarPart->obj.bDirection && pCarPart->obj.bVelocity)		// pCarPart->obj.bDirection在查找lane的最接近点的时候, 是否要关心点在不在obj的前方
 	{
-		PlannerHNS::WayPoint fake_pose = pCarPart->obj.center;
+		PlannerHNS::WayPoint fake_pose = pCarPart->obj.center;		// 从map中为每个roadSegment找出一条距离fake_pose最近的lane的wp
 		pCarPart->obj.pClosestWaypoints = MappingHelpers::GetClosestWaypointsListFromMap(fake_pose, map, m_MaxLaneDetectionDistance, pCarPart->obj.bDirection);
 		planner.PredictTrajectoriesUsingDP(fake_pose, pCarPart->obj.pClosestWaypoints, m_PredictionDistance, pCarPart->obj.predTrajectories, m_bGenerateBranches, pCarPart->obj.bDirection);
 	}

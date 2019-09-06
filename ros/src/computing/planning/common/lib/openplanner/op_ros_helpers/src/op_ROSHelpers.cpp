@@ -1577,7 +1577,7 @@ void ROSHelpers::ConvertFromAutowareDetectedObjectToOpenPlannerDetectedObject(co
 	obj.center.pos.z = det_obj.pose.position.z;
 	obj.center.pos.a = tf::getYaw(det_obj.pose.orientation);
 
-	obj.center.v = det_obj.velocity.linear.x;
+	obj.center.v = det_obj.velocity.linear.x;						// 这里有些数据的赋值感觉有点奇怪,是因为det_obj不是ros消息类型, 所以只是因为源头用的这样的赋值方式
 	obj.acceleration_raw = det_obj.velocity.linear.y;
 	obj.acceleration_desc = det_obj.velocity.linear.z;
 	obj.bVelocity = det_obj.velocity_reliable;

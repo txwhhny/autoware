@@ -239,7 +239,7 @@ void OpenPlannerSimulatorPerception::MainLoop()
 		if(m_bSetSimulatedObj)
 		{
 			m_AllObjClustersArray = m_ObjClustersArray;
-			m_AllObjClustersArray.clusters.push_back(m_SimulatedCluter);
+			m_AllObjClustersArray.clusters.push_back(m_SimulatedCluter);		// m_SimulatedCluter-rviz输入的点
 			pub_DetectedObjects.publish(m_AllObjClustersArray);
 		}
 		else

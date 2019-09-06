@@ -62,10 +62,10 @@ BehaviorGen::BehaviorGen()
 		sub_can_info = nh.subscribe("/can_info", 10, &BehaviorGen::callbackGetCANInfo, this);
 
 	sub_GlobalPlannerPaths = nh.subscribe("/lane_waypoints_array", 1, &BehaviorGen::callbackGetGlobalPlannerPath, this);
-	sub_LocalPlannerPaths = nh.subscribe("/local_weighted_trajectories", 1, &BehaviorGen::callbackGetLocalPlannerPath, this);
+	sub_LocalPlannerPaths = nh.subscribe("/local_weighted_trajectories", 1, &BehaviorGen::callbackGetLocalPlannerPath, this);	// 7局部轨迹
 	sub_TrafficLightStatus = nh.subscribe("/light_color", 1, &BehaviorGen::callbackGetTrafficLightStatus, this);
 	sub_TrafficLightSignals	= nh.subscribe("/roi_signal", 1, &BehaviorGen::callbackGetTrafficLightSignals, this);
-	sub_Trajectory_Cost = nh.subscribe("/local_trajectory_cost", 1, &BehaviorGen::callbackGetLocalTrajectoryCost, this);
+	sub_Trajectory_Cost = nh.subscribe("/local_trajectory_cost", 1, &BehaviorGen::callbackGetLocalTrajectoryCost, this);	// 最优轨迹代价信息(这里使用lane数据类型,估计是因为没有定义trajectorycost数据类型)
 
 	sub_twist_raw = nh.subscribe("/twist_raw", 1, &BehaviorGen::callbackGetTwistRaw, this);
 	sub_twist_cmd = nh.subscribe("/twist_cmd", 1, &BehaviorGen::callbackGetTwistCMD, this);
@@ -297,13 +297,13 @@ void BehaviorGen::callbackGetLocalTrajectoryCost(const autoware_msgs::LaneConstP
 {
 	bBestCost = true;
 	m_TrajectoryBestCost.bBlocked = msg->is_blocked;
-	m_TrajectoryBestCost.index = msg->lane_index;
+	m_TrajectoryBestCost.index = msg->lane_index;			// 7条轨迹中的最优轨迹的索引
 	m_TrajectoryBestCost.cost = msg->cost;
 	m_TrajectoryBestCost.closest_obj_distance = msg->closest_object_distance;
 	m_TrajectoryBestCost.closest_obj_velocity = msg->closest_object_velocity;
 }
 
-void BehaviorGen::callbackGetLocalPlannerPath(const autoware_msgs::LaneArrayConstPtr& msg)
+void BehaviorGen::callbackGetLocalPlannerPath(const autoware_msgs::LaneArrayConstPtr& msg)	// 
 {
 	if(msg->lanes.size() > 0)
 	{
@@ -435,7 +435,7 @@ void BehaviorGen::SendLocalPlanningTopics()
 {
 	//Send Behavior State
 	geometry_msgs::Twist t;
-	geometry_msgs::TwistStamped behavior;
+	geometry_msgs::TwistStamped behavior;					// 这个并不是正常的twist, 每个域有特殊用途
 	t.linear.x = m_CurrentBehavior.bNewPlan;
 	t.linear.y = m_CurrentBehavior.followDistance;
 	t.linear.z = m_CurrentBehavior.followVelocity;
