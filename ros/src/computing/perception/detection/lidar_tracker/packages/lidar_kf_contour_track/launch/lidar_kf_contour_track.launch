@@ -15,7 +15,7 @@
 	<arg name="enableSimulationMode" default="false" />
 	<arg name="enableStepByStepMode" default="false" />
 	
-	<arg name="vector_map_filter_distance" default="2.0" /> <!-- set 0 to disable vector map filtering  -->
+	<arg name="vector_map_filter_distance" default="2.0" /> <!-- set 0 to disable vector map filtering  --> <!--如下范围obj不关注:1.lane两端, 且距离大于2倍该值;2.lane中段, 且垂直距离大于该值-->
 	<arg name="enableLogging" default="false" />
 
 	<node pkg="lidar_kf_contour_track" type="lidar_kf_contour_track" name="lidar_kf_contour_track" output="screen">

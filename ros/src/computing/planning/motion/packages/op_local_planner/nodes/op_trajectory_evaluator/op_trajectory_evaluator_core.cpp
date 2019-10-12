@@ -55,7 +55,7 @@ TrajectoryEval::TrajectoryEval()
 	else if(bVelSource == 2)
 		sub_can_info = nh.subscribe("/can_info", 10, &TrajectoryEval::callbackGetCANInfo, this);
 
-	sub_GlobalPlannerPaths = nh.subscribe("/lane_waypoints_array", 1, &TrajectoryEval::callbackGetGlobalPlannerPath, this);
+	sub_GlobalPlannerPaths = nh.subscribe("/lane_waypoints_array", 1, &TrajectoryEval::callbackGetGlobalPlannerPath, this);	// 全局路径
 	sub_LocalPlannerPaths = nh.subscribe("/local_trajectories", 1, &TrajectoryEval::callbackGetLocalPlannerPath, this);
 	sub_predicted_objects = nh.subscribe("/predicted_objects", 1, &TrajectoryEval::callbackGetPredictedObjects, this);
 	sub_current_behavior = nh.subscribe("/current_behavior", 1, &TrajectoryEval::callbackGetBehaviorState, this);
@@ -262,7 +262,7 @@ void TrajectoryEval::MainLoop()
 			{
 				t_centerTrajectorySmoothed.clear();	// 根据全局路径, 当前位姿, 规划距离,以及航点密集参数生成局部规划的平滑路径
 				PlannerHNS::PlanningHelpers::ExtractPartFromPointToDistanceDirectionFast(m_GlobalPathsToUse.at(i), m_CurrentPos, m_PlanningParams.horizonDistance , m_PlanningParams.pathDensity ,t_centerTrajectorySmoothed);
-				m_GlobalPathSections.push_back(t_centerTrajectorySmoothed);
+				m_GlobalPathSections.push_back(t_centerTrajectorySmoothed);	// 截取全局路径,平滑处理,重新计算代价
 			}
 
 			if(m_GlobalPathSections.size()>0)
@@ -278,7 +278,7 @@ void TrajectoryEval::MainLoop()
 				l.cost = tc.cost;
 				l.is_blocked = tc.bBlocked;
 				l.lane_index = tc.index;
-				pub_TrajectoryCost.publish(l);	// 发布车道路径信息
+				pub_TrajectoryCost.publish(l);	// 通过lane数据结构,发布trajectorycost信息.属于非常规用法.
 			}
 
 			if(m_TrajectoryCostsCalculator.m_TrajectoryCosts.size() == m_GeneratedRollOuts.size())

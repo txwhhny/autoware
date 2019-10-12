@@ -61,7 +61,7 @@ BehaviorGen::BehaviorGen()
 	else if(bVelSource == 2)
 		sub_can_info = nh.subscribe("/can_info", 10, &BehaviorGen::callbackGetCANInfo, this);
 
-	sub_GlobalPlannerPaths = nh.subscribe("/lane_waypoints_array", 1, &BehaviorGen::callbackGetGlobalPlannerPath, this);
+	sub_GlobalPlannerPaths = nh.subscribe("/lane_waypoints_array", 1, &BehaviorGen::callbackGetGlobalPlannerPath, this);		// 全局路径
 	sub_LocalPlannerPaths = nh.subscribe("/local_weighted_trajectories", 1, &BehaviorGen::callbackGetLocalPlannerPath, this);	// 7局部轨迹
 	sub_TrafficLightStatus = nh.subscribe("/light_color", 1, &BehaviorGen::callbackGetTrafficLightStatus, this);
 	sub_TrafficLightSignals	= nh.subscribe("/roi_signal", 1, &BehaviorGen::callbackGetTrafficLightSignals, this);
@@ -183,18 +183,18 @@ void BehaviorGen::callbackGetCommandCMD(const autoware_msgs::ControlCommandConst
 	m_Ctrl_cmd = *msg;
 }
 
-void BehaviorGen::callbackGetCurrentPose(const geometry_msgs::PoseStampedConstPtr& msg)
+void BehaviorGen::callbackGetCurrentPose(const geometry_msgs::PoseStampedConstPtr& msg)	
 {
 	m_CurrentPos = PlannerHNS::WayPoint(msg->pose.position.x, msg->pose.position.y, msg->pose.position.z, tf::getYaw(msg->pose.orientation));
 	bNewCurrentPos = true;
 }
 
-void BehaviorGen::callbackGetVehicleStatus(const geometry_msgs::TwistStampedConstPtr& msg)
+void BehaviorGen::callbackGetVehicleStatus(const geometry_msgs::TwistStampedConstPtr& msg)		// 从current_velocity得到车速和转角
 {
 	m_VehicleStatus.speed = msg->twist.linear.x;
 	m_CurrentPos.v = m_VehicleStatus.speed;
 	if(fabs(msg->twist.linear.x) > 0.25)
-		m_VehicleStatus.steer = atan(m_CarInfo.wheel_base * msg->twist.angular.z/msg->twist.linear.x);
+		m_VehicleStatus.steer = atan(m_CarInfo.wheel_base * msg->twist.angular.z/msg->twist.linear.x);	// 车的转角: 轴距 / r
 	UtilityHNS::UtilityH::GetTickCount(m_VehicleStatus.tStamp);
 	bVehicleStatus = true;
 }
@@ -435,7 +435,7 @@ void BehaviorGen::SendLocalPlanningTopics()
 {
 	//Send Behavior State
 	geometry_msgs::Twist t;
-	geometry_msgs::TwistStamped behavior;					// 这个并不是正常的twist, 每个域有特殊用途
+	geometry_msgs::TwistStamped behavior;					// 这个并不是正常的twist, 每个域有特殊用途,非常规用法
 	t.linear.x = m_CurrentBehavior.bNewPlan;
 	t.linear.y = m_CurrentBehavior.followDistance;
 	t.linear.z = m_CurrentBehavior.followVelocity;

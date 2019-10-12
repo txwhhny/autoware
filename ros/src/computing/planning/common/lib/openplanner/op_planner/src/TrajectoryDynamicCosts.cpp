@@ -33,7 +33,7 @@ TrajectoryDynamicCosts::~TrajectoryDynamicCosts()
 {
 }
 
-TrajectoryCost TrajectoryDynamicCosts::DoOneStepDynamic(const vector<vector<WayPoint> >& rollOuts,	// 规划出的7条局部路径
+TrajectoryCost TrajectoryDynamicCosts::DoOneStepDynamic(const vector<vector<WayPoint> >& rollOuts,	// 由generator给出的7条局部路径
 		const vector<WayPoint>& totalPaths, const WayPoint& currState,																	// 被规划的全局路径
 		const PlanningParams& params, const CAR_BASIC_INFO& carInfo, const VehicleState& vehicleState,
 		const std::vector<PlannerHNS::DetectedObject>& obj_list, const int& iCurrentIndex)	// iCurrentIndex默认值为-1
@@ -45,7 +45,7 @@ TrajectoryCost TrajectoryDynamicCosts::DoOneStepDynamic(const vector<vector<WayP
 	bestTrajectory.index = -1;
 
 	double critical_lateral_distance 	=  carInfo.width/2.0 + params.horizontalSafetyDistancel;			// 侧向安全距离
-	double critical_long_front_distance =  carInfo.wheel_base/2.0 + carInfo.length/2.0 + params.verticalSafetyDistance;	// 前方安全距离
+	double critical_long_front_distance =  carInfo.wheel_base/2.0 + carInfo.length/2.0 + params.verticalSafetyDistance;	// 前方安全距离, 中心其实相当于在后轮轴上
 	double critical_long_back_distance 	=  carInfo.length/2.0 + params.verticalSafetyDistance - carInfo.wheel_base/2.0;
 
 	int currIndex = -1;
@@ -54,7 +54,7 @@ TrajectoryCost TrajectoryDynamicCosts::DoOneStepDynamic(const vector<vector<WayP
 	else
 		currIndex = GetCurrentRollOutIndex(totalPaths, currState, params);		// 根据currState和totalPaths, 得到在rollOuts中,当前最接近的索引
 
-	InitializeCosts(rollOuts, params);	// 初始化m_TrajectoryCosts
+	InitializeCosts(rollOuts, params);	// 初始化m_TrajectoryCosts,主要包括priority_cost-中心线为0,lane_change_cost变道代价(即改变了全局路径的代价)
 	// 根据侧向和前后安全距离, 生成安全平行四边形
 	InitializeSafetyPolygon(currState, carInfo, vehicleState, critical_lateral_distance, critical_long_front_distance, critical_long_back_distance);
 	// 计算规划出的7条局部路径的过渡代价

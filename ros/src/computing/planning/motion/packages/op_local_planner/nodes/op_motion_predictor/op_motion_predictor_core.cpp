@@ -242,7 +242,7 @@ void MotionPrediction::callbackGetTrackedObjects(const autoware_msgs::DetectedOb
 			m_PredictedResultsResults.objects.push_back(pred_obj);
 		}
 
-		if(m_bEnableCurbObstacles)
+		if(m_bEnableCurbObstacles)			// 如果也检测路岩, 则添加到m_PredictedResultsResults中
 		{
 			curr_curbs_obstacles.clear();
 			GenerateCurbsObstacles(curr_curbs_obstacles);

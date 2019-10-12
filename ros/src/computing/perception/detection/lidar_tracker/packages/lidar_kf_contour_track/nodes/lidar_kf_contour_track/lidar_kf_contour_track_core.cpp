@@ -249,7 +249,7 @@ bool ContourTracker::IsCar(const PlannerHNS::DetectedObject& obj, const PlannerH
 		bool bOnLane = false;
 	//	std::cout << "Debug Obj: " << obj.id << ", Closest Lane: " << m_ClosestLanesList.size() << std::endl;
 
-		for(unsigned int i =0 ; i < m_ClosestLanesList.size(); i++)
+		for(unsigned int i =0 ; i < m_ClosestLanesList.size(); i++)		// 遍历所有车道
 		{
 
 			PlannerHNS::RelativeInfo info;
@@ -260,7 +260,7 @@ bool ContourTracker::IsCar(const PlannerHNS::DetectedObject& obj, const PlannerH
 
 		//	std::cout << "- Distance To Car: " << obj.distance_to_center << ", PerpD: " << info.perp_distance << ", DirectD: " << direct_d << ", bAfter: " << info.bAfter << ", bBefore: " << info.bBefore << std::endl;
 
-			if((info.bAfter || info.bBefore) && direct_d > m_MapFilterDistance*2.0)		// 如果点p在轨迹的前/后方, 并且距离大于两倍搜索范围, 则跳过
+			if((info.bAfter || info.bBefore) && direct_d > m_MapFilterDistance*2.0)		// 如果点p在轨迹的前/后方, 并且距离大于两倍搜索范围, 则跳过, 表示不在当前车道上
 				continue;
 
 			if(fabs(info.perp_distance) <= m_MapFilterDistance)		// 如果点p与轨迹的"垂直"距离小于m_MapFilterDistance
@@ -270,7 +270,7 @@ bool ContourTracker::IsCar(const PlannerHNS::DetectedObject& obj, const PlannerH
 			}
 		}
 
-		if(bOnLane == false)
+		if(bOnLane == false)			// 如果判定不在车道上, 则直接返回false, 表示不会被判定为障碍物了, 因为不会碰撞
 			return false;
 	}
 
@@ -296,7 +296,7 @@ bool ContourTracker::IsCar(const PlannerHNS::DetectedObject& obj, const PlannerH
 		double distance_y = fabs(relative_point.y);
 
 		if(distance_x  <= m_Params.VehicleLength*0.5 && distance_y <=  m_Params.VehicleWidth*0.5) // don't detect yourself
-			return false;					// 这个有写反? 在这个范围内, 不就是车身的范围吗?
+			return false;					// 返回false, 就表示不关注这个obj, 不会被判定为障碍物
 	}
 
 	return true;

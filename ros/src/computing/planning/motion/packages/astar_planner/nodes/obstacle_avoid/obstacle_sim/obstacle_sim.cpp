@@ -60,9 +60,9 @@ void ObstacleSim::initForROS()
   nav_goal_sub_ = nh_.subscribe("move_base_simple/goal", 1, &ObstacleSim::callbackFromNavGoal, this);
 
   // setup publisher
-  obstacle_sim_points_pub_ = nh_.advertise<visualization_msgs::Marker>("obstacle_sim_points", 1, true);
-  obstacle_sim_pointcloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("obstacle_sim_pointcloud", 1, true);
-  obstacle_marker_pub_ = nh_.advertise<visualization_msgs::Marker>("astar_sim_obstacle", 1, true);
+  obstacle_sim_points_pub_ = nh_.advertise<visualization_msgs::Marker>("obstacle_sim_points", 1, true);   // 矩形
+  obstacle_sim_pointcloud_pub_ = nh_.advertise<sensor_msgs::PointCloud2>("obstacle_sim_pointcloud", 1, true); // 点云形式矩形
+  obstacle_marker_pub_ = nh_.advertise<visualization_msgs::Marker>("astar_sim_obstacle", 1, true);  // 矩形顶点
 }
 
 void ObstacleSim::callbackFromNavGoal(const geometry_msgs::PoseStampedConstPtr& msg)
@@ -75,7 +75,7 @@ void ObstacleSim::callbackFromNavGoal(const geometry_msgs::PoseStampedConstPtr& 
   // reset points
   obstacle_points_.clear();
 
-  // points at each vertex of rectangle
+  // points at each vertex of rectangle   // 用普通直角坐标系下看待,以目标点为中心构造的矩形顶点坐标
   geometry_msgs::Point upper_left, upper_right, lower_left, lower_right;
   upper_left.x  = msg->pose.position.x - obstacle_width_ / 2.0;
   upper_left.y  = msg->pose.position.y + obstacle_height_ / 2.0;
@@ -87,7 +87,7 @@ void ObstacleSim::callbackFromNavGoal(const geometry_msgs::PoseStampedConstPtr& 
   lower_right.y = lower_left.y;
 
   // points along each side
-  for (double x = upper_left.x; x < upper_right.x; x += points_interval_)
+  for (double x = upper_left.x; x < upper_right.x; x += points_interval_)   // 构造点,相当于与x轴平行的"线"
   {
     geometry_msgs::Point up, down;
     up.x = x;
@@ -98,7 +98,7 @@ void ObstacleSim::callbackFromNavGoal(const geometry_msgs::PoseStampedConstPtr& 
     obstacle_points_.emplace_back(up);
     obstacle_points_.emplace_back(down);
   }
-  for (double y = upper_left.y; y > lower_left.y; y -= points_interval_)
+  for (double y = upper_left.y; y > lower_left.y; y -= points_interval_)  // 画与y轴平行的"线",就得到了矩形
   {
     geometry_msgs::Point left, right;
     left.x = upper_left.x;
@@ -193,7 +193,7 @@ void ObstacleSim::publishPoints()
 
   tf::Transform sensor2world = world2sensor.inverse();
 
-  std::vector<geometry_msgs::Point> obstacle_points_tf;
+  std::vector<geometry_msgs::Point> obstacle_points_tf;   // 把矩形点转换到传感器坐标系下
   for (const auto& p : obstacle_points_)
   {
     geometry_msgs::Point tf_p = transformPoint(p, sensor2world);
@@ -203,7 +203,7 @@ void ObstacleSim::publishPoints()
   }
 
   sensor_msgs::PointCloud2 ros_pointcloud;
-  convertToPointCloud2(obstacle_points_tf, &ros_pointcloud);
+  convertToPointCloud2(obstacle_points_tf, &ros_pointcloud);  // 把矩形转换成点云数据格式,且是传感器坐标系下的点
   ros_pointcloud.header.frame_id = obstacle_frame_;
   ros_pointcloud.header.stamp = ros::Time();
 
