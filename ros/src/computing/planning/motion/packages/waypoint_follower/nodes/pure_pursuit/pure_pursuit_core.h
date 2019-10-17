@@ -68,6 +68,9 @@ private:
 
   // subscriber
   ros::Subscriber sub1_, sub2_, sub3_, sub4_;
+  // -----2019.10.12-----
+  ros::Subscriber sub5_;
+  //---------------------
 
   // constant
   const int LOOP_RATE_;  // processing frequency
@@ -89,6 +92,7 @@ private:
   void callbackFromCurrentPose(const geometry_msgs::PoseStampedConstPtr &msg);
   void callbackFromCurrentVelocity(const geometry_msgs::TwistStampedConstPtr &msg);
   void callbackFromWayPoints(const autoware_msgs::LaneConstPtr &msg);
+  void loopWaypointsCallback(const autoware_msgs::LaneConstPtr &msg);  
 
   // initializer
   void initForROS();

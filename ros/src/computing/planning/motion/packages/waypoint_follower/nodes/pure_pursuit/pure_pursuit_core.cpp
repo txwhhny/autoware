@@ -59,6 +59,7 @@ void PurePursuitNode::initForROS()
   sub2_ = nh_.subscribe("current_pose", 10, &PurePursuitNode::callbackFromCurrentPose, this);
   sub3_ = nh_.subscribe("config/waypoint_follower", 10, &PurePursuitNode::callbackFromConfig, this);
   sub4_ = nh_.subscribe("current_velocity", 10, &PurePursuitNode::callbackFromCurrentVelocity, this);
+  sub5_ = nh_.subscribe("loop_waypoints", 10, &PurePursuitNode::loopWaypointsCallback, this);
 
   // setup publisher
   pub1_ = nh_.advertise<geometry_msgs::TwistStamped>("twist_raw", 10);
@@ -221,8 +222,25 @@ void PurePursuitNode::callbackFromCurrentVelocity(const geometry_msgs::TwistStam
   is_velocity_set_ = true;
 }
 
-void PurePursuitNode::callbackFromWayPoints(const autoware_msgs::LaneConstPtr &msg)
+// ----------------2019.10.12-----------------------
+static autoware_msgs::Lane loopWaypoints;
+void PurePursuitNode::loopWaypointsCallback(const autoware_msgs::LaneConstPtr &msg)
 {
+  loopWaypoints = *msg;
+}
+
+void PurePursuitNode::callbackFromWayPoints(const autoware_msgs::LaneConstPtr &msg_input)
+{
+  autoware_msgs::Lane::Ptr msg(new autoware_msgs::Lane);
+  *msg = *msg_input;
+  if (!loopWaypoints.waypoints.empty())
+  {
+    msg->waypoints.insert(msg->waypoints.end(), loopWaypoints.waypoints.begin(), loopWaypoints.waypoints.end());
+    loopWaypoints.waypoints.clear();
+  }
+  ROS_INFO("final_waypoints[pure_pursuit] size now is :%d", msg->waypoints.size());
+
+
   if (!msg->waypoints.empty())
     command_linear_velocity_ = msg->waypoints.at(0).twist.twist.linear.x;   // 从航点中得到速度
   else
@@ -231,6 +249,7 @@ void PurePursuitNode::callbackFromWayPoints(const autoware_msgs::LaneConstPtr &m
   pp_.setCurrentWaypoints(msg->waypoints);
   is_waypoint_set_ = true;
 }
+//-------------------------------------------------
 
 double convertCurvatureToSteeringAngle(const double &wheel_base, const double &kappa)
 {
