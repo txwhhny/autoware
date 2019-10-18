@@ -105,7 +105,7 @@ void ROSHelpers::InitMarkers(const int& nMarkers,
 
 	for(int i=nMarkers*3; i<nMarkers*4; i++)
 	{
-		visualization_msgs::Marker mkr = CreateGenMarker(0,0,0,0,1,1,1,1,i,"detected_polygons", visualization_msgs::Marker::LINE_STRIP);
+		visualization_msgs::Marker mkr = CreateGenMarker(0,0,0,0,1,1,1,1,i,"", visualization_msgs::Marker::LINE_STRIP);
 		polygons.markers.push_back(mkr);
 	}
 
@@ -694,31 +694,31 @@ void ROSHelpers::TrajectoriesToColoredMarkers(const std::vector<std::vector<Plan
 		if(traj_costs.size() == paths.size())
 		{
 			float norm_cost = traj_costs.at(i).cost * paths.size();
-			if(norm_cost <= 1.0)
+			if(norm_cost <= 1.0)									// 绿多红少
 			{
 				lane_waypoint_marker.color.r = norm_cost;
 				lane_waypoint_marker.color.g = 1.0;
 			}
 			else if(norm_cost > 1.0)
 			{
-				lane_waypoint_marker.color.r = 1.0;
+				lane_waypoint_marker.color.r = 1.0;	// 红多绿少
 				lane_waypoint_marker.color.g = 2.0 - norm_cost;
 			}
 		}
 		else
 		{
-			lane_waypoint_marker.color.r = 1.0;
+			lane_waypoint_marker.color.r = 1.0;		// 红色
 			lane_waypoint_marker.color.g = 0.0;
 		}
 
-		if(traj_costs.at(i).bBlocked)
+		if(traj_costs.at(i).bBlocked)		// 红色
 		{
 			lane_waypoint_marker.color.r = 1.0;
 			lane_waypoint_marker.color.g = 0.0;
 			lane_waypoint_marker.color.b = 0.0;
 		}
 
-		if(i == iClosest)
+		if(i == iClosest)		// 紫色
 		{
 			lane_waypoint_marker.color.r = 1.0;
 			lane_waypoint_marker.color.g = 0.0;

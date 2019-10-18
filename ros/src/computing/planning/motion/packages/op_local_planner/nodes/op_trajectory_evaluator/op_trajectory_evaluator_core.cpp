@@ -271,7 +271,7 @@ void TrajectoryEval::MainLoop()
 					tc = m_TrajectoryCostsCalculator.DoOneStepDynamic(m_GeneratedRollOuts, m_GlobalPathSections.at(0), m_CurrentPos,m_PlanningParams,	m_CarInfo,m_VehicleStatus, m_PredictedObjects, m_CurrentBehavior.iTrajectory);
 				else
 					tc = m_TrajectoryCostsCalculator.DoOneStepStatic(m_GeneratedRollOuts, m_GlobalPathSections.at(0), m_CurrentPos,	m_PlanningParams,	m_CarInfo,m_VehicleStatus, m_PredictedObjects);
-
+				// tc 其实就是m_TrajectoryCosts中代价最小的那个元素
 				autoware_msgs::Lane l;
 				l.closest_object_distance = tc.closest_obj_distance;
 				l.closest_object_velocity = tc.closest_obj_velocity;

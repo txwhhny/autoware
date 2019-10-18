@@ -177,16 +177,16 @@ void DecisionMaker::InitBehaviorStates()
 
 	pValues->bFullyBlock = bestTrajectory.bBlocked;
 
- 	if(bestTrajectory.lane_index >=0)
+ 	if(bestTrajectory.lane_index >=0)												// 起始这里恒为false, 因为bestTrajectory.lane_index来自话题/local_trajectory_cost, lane_index没有被赋值, 默认为-1
  		pValues->iCurrSafeLane = bestTrajectory.lane_index;		// 当前安全车道
  	else
- 	{
+ 	{	// 由于回调callbackGetLocalPlannerPath比较的都是全局和局部路径的第0个元素, 所以正常来讲pValues->iCurrSafeLane也应该恒为0
  		PlannerHNS::RelativeInfo info;
- 		PlannerHNS::PlanningHelpers::GetRelativeInfoRange(m_TotalPath, state, m_params.rollOutDensity*m_params.rollOutNumber/2.0 + 0.1, info);
+ 		PlannerHNS::PlanningHelpers::GetRelativeInfoRange(m_TotalPath, state, m_params.rollOutDensity*m_params.rollOutNumber/2.0 + 0.1, info); // m_TotalPath就是来自于话题的全局路径
  		pValues->iCurrSafeLane = info.iGlobalPath;
  	}
 
- 	double critical_long_front_distance =  m_CarInfo.wheel_base/2.0 + m_CarInfo.length/2.0 + m_params.verticalSafetyDistance;
+ 	double critical_long_front_distance =  m_CarInfo.wheel_base/2.0 + m_CarInfo.length/2.0 + m_params.verticalSafetyDistance; // base_link在后轮轴上, 所以这么计算
 
 	if(ReachEndOfGlobalPath(pValues->minStoppingDistance + critical_long_front_distance, pValues->iCurrSafeLane))
 		pValues->currentGoalID = -1;

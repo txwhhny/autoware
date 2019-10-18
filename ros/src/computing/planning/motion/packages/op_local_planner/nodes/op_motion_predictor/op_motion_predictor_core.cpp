@@ -220,17 +220,17 @@ void MotionPrediction::callbackGetTrackedObjects(const autoware_msgs::DetectedOb
 	}
 
 	if(bMap)
-	{
+	{	// m_TrackedObjects[i].predTrajectories是空的
 		if(m_PredictBeh.m_bStepByStep && m_bGoNextStep)
 		{
 			m_bGoNextStep = false;
-			m_PredictBeh.DoOneStep(m_TrackedObjects, m_CurrentPos, m_PlanningParams.minSpeed, m_CarInfo.max_deceleration,  m_Map);
+			m_PredictBeh.DoOneStep(m_TrackedObjects, m_CurrentPos, m_PlanningParams.minSpeed, m_CarInfo.max_deceleration,  m_Map);	// 得到obj的trajectory
 		}
 		else if(!m_PredictBeh.m_bStepByStep)
 		{
-			m_PredictBeh.DoOneStep(m_TrackedObjects, m_CurrentPos, m_PlanningParams.minSpeed, m_CarInfo.max_deceleration,  m_Map);
+			m_PredictBeh.DoOneStep(m_TrackedObjects, m_CurrentPos, m_PlanningParams.minSpeed, m_CarInfo.max_deceleration,  m_Map); // 得到obj的trajectory
 		}
-
+		// m_PredictBeh.m_ParticleInfo_II.at(i)->obj.predTrajectories不为空
 
 		m_PredictedResultsResults.objects.clear();
 		autoware_msgs::DetectedObject pred_obj;
