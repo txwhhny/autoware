@@ -179,7 +179,7 @@ public:
 		cv::Mat_<float> measurement(nMeasure,1);	// 观测: x, y
 		cv::Mat_<float> prediction(nStates,1);		// 状态空间: x, y, vx, vy
 
-		measurement(0) = oldObj.center.pos.x;
+		measurement(0) = oldObj.center.pos.x;			// oldObj是t时刻的观测, prev_x和prev_y是t-1时刻的状态, predObj是t时刻的状态
 		measurement(1) = oldObj.center.pos.y;
 
 		prediction = m_filter.correct(measurement);		// 根据测量结果来更新预测的状态
@@ -197,7 +197,7 @@ public:
 		{
 			currV = sqrt(vx*vx+vy*vy);			// 计算当前速度和偏航
 
-			double diff_y = predObj.center.pos.y - prev_y;
+			double diff_y = predObj.center.pos.y - prev_y;	
 			double diff_x = predObj.center.pos.x - prev_x;
 			if(hypot(diff_y, diff_x) > 0.2)
 			{
@@ -245,7 +245,7 @@ public:
 			predObj.bVelocity = false;
 		}
 
-		if(predObj.centers_list.size() > PREV_TRACK_SIZE)
+		if(predObj.centers_list.size() > PREV_TRACK_SIZE)		// 中心轨迹
 					predObj.centers_list.erase(predObj.centers_list.begin()+0);
 
 		if(predObj.centers_list.size() > 1)

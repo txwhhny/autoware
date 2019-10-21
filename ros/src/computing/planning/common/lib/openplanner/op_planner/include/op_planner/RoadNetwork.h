@@ -818,7 +818,7 @@ public:
 	WayPoint predicted_center;
 	WayPoint noisy_center;
 	STATE_TYPE predicted_behavior;
-	std::vector<WayPoint> centers_list;
+	std::vector<WayPoint> centers_list;	// obj的中心运行轨迹
 	std::vector<GPSPoint> contour;
 	std::vector<std::vector<WayPoint> > predTrajectories;
 	std::vector<WayPoint*> pClosestWaypoints;		// 与center最接近(有距离上限)的所有roadsegment的所有lane中的wp(也就是"每个"lane都有一个最接近的wp)

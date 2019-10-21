@@ -491,7 +491,7 @@ void SimpleTracker::AssociateSimply()
 	for(unsigned int i = 0; i < m_TrackSimply.size(); i++)
 		m_TrackSimply.at(i).m_bUpdated = false;
 
-	MatchWithDistanceOnly();  // 根据距离关联m_DetectedObjects和m_TrackSimply的obj,更新到m_TrackSimply
+	MatchWithDistanceOnly();  // 根据距离, 尺寸,中心位置, 关联m_DetectedObjects和m_TrackSimply的obj,更新到m_TrackSimply
 
 	for(unsigned int i =0; i< m_TrackSimply.size(); i++)
 		m_TrackSimply.at(i).UpdateTracking(m_dt, m_TrackSimply.at(i).obj, m_TrackSimply.at(i).obj);		// 通过kf进行跟踪
