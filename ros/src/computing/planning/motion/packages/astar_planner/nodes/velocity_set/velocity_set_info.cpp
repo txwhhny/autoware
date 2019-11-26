@@ -68,7 +68,7 @@ void VelocitySetInfo::configCallback(const autoware_config_msgs::ConfigVelocityS
   temporal_waypoints_size_ = config->temporal_waypoints_size;
 }
 
-void VelocitySetInfo::pointsCallback(const sensor_msgs::PointCloud2ConstPtr &msg)
+void VelocitySetInfo::pointsCallback(const sensor_msgs::PointCloud2ConstPtr &msg)   // 筛选符合检测范围的点
 {
   pcl::PointCloud<pcl::PointXYZ> sub_points;
   pcl::fromROSMsg(*msg, sub_points);
@@ -79,17 +79,17 @@ void VelocitySetInfo::pointsCallback(const sensor_msgs::PointCloud2ConstPtr &msg
     if (v.x == 0 && v.y == 0)
       continue;
 
-    if (v.z > detection_height_top_ || v.z < detection_height_bottom_)
+    if (v.z > detection_height_top_ || v.z < detection_height_bottom_)  // 高度在区间外的过滤掉
       continue;
 
     // ignore points nearby the vehicle
-    if (v.x * v.x + v.y * v.y < remove_points_upto_ * remove_points_upto_)
+    if (v.x * v.x + v.y * v.y < remove_points_upto_ * remove_points_upto_)  // 距离太近的点过滤掉
       continue;
 
     points_.push_back(v);
   }
 
-  if (use_obstacle_sim_)
+  if (use_obstacle_sim_)    // 加入模拟障碍物的点
   {
     joinPoints(obstacle_sim_points_, &points_);
     obstacle_sim_points_.clear();

@@ -293,7 +293,7 @@ void DecisionMaker::InitBehaviorStates()
 
 	 if(!preCalcPrams || m_RollOuts.size() == 0) return bNewTrajectory;
 
-	int currIndex = PlannerHNS::PlanningHelpers::GetClosestNextPointIndexFast(m_Path, state);
+	int currIndex = PlannerHNS::PlanningHelpers::GetClosestNextPointIndexFast(m_Path, state);		// state-current_pose
 	int index_limit = 0;
 	if(index_limit<=0)
 		index_limit =  m_Path.size()/2.0;
