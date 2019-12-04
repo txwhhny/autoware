@@ -2388,7 +2388,7 @@ void MappingHelpers::ConstructRoadNetworkFromROSMessageV2(const std::vector<Util
 
 	//Link StopLines and Traffic Lights
 	cout << " >> Link StopLines and Traffic Lights ... " << endl;
-	LinkTrafficLights	AndStopLinesV2(map);
+	LinkTrafficLightsAndStopLinesV2(map);
 //	//LinkTrafficLightsAndStopLinesConData(conn_data, id_replace_list, map);
 
 	cout << " >> Map loaded from data with " << roadLanes.size()  << " lanes" << endl;

@@ -128,6 +128,7 @@ static ros::Publisher ndt_map_pub;
 static ros::Publisher current_pose_pub;
 static ros::Publisher guess_pose_linaer_pub;
 static geometry_msgs::PoseStamped current_pose_msg, guess_pose_msg;
+static ros::Publisher map_saved_pub;
 
 static ros::Publisher ndt_stat_pub;
 static std_msgs::Bool ndt_stat_msg;
@@ -218,16 +219,29 @@ static void output_callback(const autoware_config_msgs::ConfigNDTMappingOutput::
   ndt_map_pub.publish(*map_msg_ptr);
 
   // Writing Point Cloud data to PCD file
-  if (filter_res == 0.0)
+  bool ret = true;
+  try
   {
-    pcl::io::savePCDFileASCII(filename, *map_ptr);
-    std::cout << "Saved " << map_ptr->points.size() << " data points to " << filename << "." << std::endl;
+    if (filter_res == 0.0)
+    {
+      pcl::io::savePCDFileASCII(filename, *map_ptr);
+      std::cout << "Saved " << map_ptr->points.size() << " data points to " << filename << "." << std::endl;
+    }
+    else
+    {
+      pcl::io::savePCDFileASCII(filename, *map_filtered);
+      std::cout << "Saved " << map_filtered->points.size() << " data points to " << filename << "." << std::endl;
+    }
   }
-  else
+  catch (std::exception& e)
   {
-    pcl::io::savePCDFileASCII(filename, *map_filtered);
-    std::cout << "Saved " << map_filtered->points.size() << " data points to " << filename << "." << std::endl;
+    ret = false;
+    std::cout << "output_callback exception" << e.what() << std::endl;
   }
+
+  std_msgs::Bool saved;
+  saved.data = ret;
+  map_saved_pub.publish(saved);
 }
 
 static void imu_odom_calc(ros::Time current_time)
@@ -1033,6 +1047,7 @@ int main(int argc, char** argv)
 
   ndt_map_pub = nh.advertise<sensor_msgs::PointCloud2>("/ndt_map", 1000);
   current_pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/current_pose", 1000);
+  map_saved_pub = nh.advertise<std_msgs::Bool>("/map_saved", 10);
 
   ros::Subscriber param_sub = nh.subscribe("config/ndt_mapping", 10, param_callback);
   ros::Subscriber output_sub = nh.subscribe("config/ndt_mapping_output", 10, output_callback);

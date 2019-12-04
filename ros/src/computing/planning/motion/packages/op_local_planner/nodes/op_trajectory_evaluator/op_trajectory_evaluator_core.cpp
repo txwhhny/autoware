@@ -197,8 +197,16 @@ void TrajectoryEval::callbackGetLocalPlannerPath(const autoware_msgs::LaneArrayC
 			std::vector<PlannerHNS::WayPoint> path;
 			PlannerHNS::ROSHelpers::ConvertFromAutowareLaneToLocalLane(msg->lanes.at(i), path);
 			m_GeneratedRollOuts.push_back(path);
-			if(path.size() > 0)
-				globalPathId_roll_outs = path.at(0).gid;		// 全局路径id
+
+			// 这2行注释掉
+			// if(path.size() > 0)
+			// 	globalPathId_roll_outs = path.at(0).gid;
+			
+			// 新增如下4行
+			if(path.size() > 0 && m_GlobalPaths.size() > 0 && m_GlobalPaths.at(0).size() > 0 && path.at(0).gid == m_GlobalPaths.at(0).at(0).gid)
+			{
+				globalPathId_roll_outs = path.at(0).gid;
+			}
 		}
 
 		if(bWayGlobalPath && m_GlobalPaths.size() > 0 && m_GlobalPaths.at(0).size() > 0)
